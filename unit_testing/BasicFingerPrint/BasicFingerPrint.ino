@@ -29,6 +29,9 @@ using std::vector;
 
 const byte ROWS = 4; //four rows
 const byte COLS = 4; //four columns
+const int redPin = 13;
+const int greenPin = 12;
+const int bluePin = 14;
 
 char hexaKeys[ROWS][COLS] = {
   {'1','2','3', 'A'},
@@ -59,7 +62,9 @@ typedef struct firebaseUserDetails_t {
 
 void setup() {
   Serial.begin(115200);
-
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
   //-----------initiate OLED display-------------
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x64
@@ -313,7 +318,7 @@ uint8_t getFingerprintEnroll() {
       display.setTextSize(1); // Normal 2:2 pixel scale
       display.setTextColor(WHITE); // Draw white text
       display.setCursor(0,0); // Start at top-left corner
-      display.print(F("scanning"));
+      display.print(F("Registering"));
       display.display();
       break;
     case FINGERPRINT_PACKETRECIEVEERR:
@@ -531,28 +536,64 @@ void updatingTheTimeForApprovedUser(int fingerprint_id) {
   }
 }
 
+
+void setColor(int redValue, int greenValue, int blueValue) {
+  analogWrite(redPin, redValue);
+  analogWrite(greenPin, greenValue);
+  analogWrite(bluePin, blueValue);
+}
+
 void loop() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 10);
+  // Display static text
+  display.println("For Access, place");
+  display.setCursor(0, 30);
+  display.println("finger on sensor");
+  display.display();
+  setColor(0, 0, 255);
   ////////////////////////
   FingerID = getFingerprintID(); // Get the Fingerprint ID from the Scanner
   //Serial.println(FingerID);
   //Serial.println("\n");
-  delay(50);
-  DisplayFingerprintID();
-
+  delay(50); 
   User current_user;
-
   //Didn't find a match
   if (FingerID == -1) {
+    setColor(255, 0, 0);
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0, 10);
+    display.println("Access Denied! You");
+    display.setCursor(0, 30);
+    display.println("are not registered.");
+    display.display();
+    delay(3000);
     id = getIDForFingerPrint();
     id_arr[id - 1] = true;
     addFingerprintAndUserIDToList(current_user);
     pending_users.push_back(current_user);    
   } else if (FingerID > 0)  {
-
     if (isApprovedUser(FingerID)) {
       updatingTheTimeForApprovedUser(FingerID);
+      setColor(0, 255, 0);
+      delay(1000);
       display.println("Welcome!\n");
     } else {
+      setColor(255, 0, 255);
+      display.clearDisplay();
+      display.setTextSize(1);
+      display.setTextColor(WHITE);
+      display.setCursor(0, 10);
+      // Display static text
+      display.println("Access Denied, you");
+      display.setCursor(0, 30);
+      display.println("are in the waiting   list");
+      display.display();
+      delay(1000);
       Serial.println("You are in the pending list mannn!, wait until the ceo accept your request\n");
     }
   }
