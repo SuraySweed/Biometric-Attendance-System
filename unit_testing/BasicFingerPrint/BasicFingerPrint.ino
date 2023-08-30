@@ -556,9 +556,9 @@ void loop() {
   setColor(0, 0, 255);
   ////////////////////////
   FingerID = getFingerprintID(); // Get the Fingerprint ID from the Scanner
-  //Serial.println(FingerID);
-  //Serial.println("\n");
+
   delay(50); 
+  
   User current_user;
   //Didn't find a match
   if (FingerID == -1) {
@@ -571,7 +571,9 @@ void loop() {
     display.setCursor(0, 30);
     display.println("are not registered.");
     display.display();
+	
     delay(3000);
+	
     id = getIDForFingerPrint();
     id_arr[id - 1] = true;
     addFingerprintAndUserIDToList(current_user);
@@ -579,6 +581,7 @@ void loop() {
   } else if (FingerID > 0)  {
     if (isApprovedUser(FingerID)) {
       updatingTheTimeForApprovedUser(FingerID);
+	  
       setColor(0, 255, 0);
       delay(1000);
       display.println("Welcome!\n");
