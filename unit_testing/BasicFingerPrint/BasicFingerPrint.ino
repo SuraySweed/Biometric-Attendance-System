@@ -15,6 +15,9 @@
 #include <TimeLib.h> 
 #include "SPIFFS.h"
 #include <ArduinoJson.h>
+#include <map>
+#include <Firebase_ESP_Client.h>
+#include <addons/TokenHelper.h>
 
 
 // Pins connected to the fingerprint sensor
@@ -61,9 +64,19 @@ uint8_t fingerPrintID;
 String id_str;
 const char* path = "/data_users.json";
 
+// Firebase configuration
+const char* API_KEY = "AIzaSyCQOPaLIyCOJI71ASLu-DvJTlsbGsqRupA";
+const char* FIREBASE_PROJECT_ID = "biometric-attendance-sys-1deca";
+
+
 void fingerPrintSensorClear();
 void initiatefile();
+void printSPIFFSfiles();
 
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+bool signupOK = false;
 
 void setup() {
   Serial.begin(115200);
@@ -122,18 +135,33 @@ void setup() {
   }
 
   //fingerPrintSensorClear(); // very importantttt 
+  
   finger.getTemplateCount();
   Serial.print("Sensor contains "); Serial.print(finger.templateCount); Serial.println(" templates");
-  Serial.println("Waiting for valid finger...");
 
-
-  Serial.println("Files stored in SPIFFS:");
-  File root = SPIFFS.open("/");
-  File file = root.openNextFile();
-  while (file) {
-    Serial.println(file.name());
-    file = root.openNextFile();
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
   }
+
+  config.api_key = API_KEY;
+  /* Sign up */
+  if (Firebase.signUp(&config, &auth, "", "")){
+    Serial.println("ok");
+    signupOK = true;
+  }
+  else{
+    Serial.printf("%s\n", config.signer.signupError.message.c_str());
+  }
+  config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
+
+  Firebase.begin(&config, &auth);
+    
+  Firebase.reconnectWiFi(true);
+
+  
+  Serial.println("Waiting for valid finger...");
 }
 
 void fingerPrintSensorClear() {
@@ -540,15 +568,15 @@ void saveUserDataToFile(int fingerprint_id, String id, bool is_appending, bool i
 
     file = SPIFFS.open(path, "r");
     if(!file){
-    Serial.println("Failed to open file for reading");
-    return;
+      Serial.println("saveUserDataToFile----------- Failed to open file for reading");
+      return;
     }
-   Serial.println("\n");
-   Serial.println("File Content:");
+    Serial.println("\n");
+    Serial.println("File Content:");
     while(file.available()){
       Serial.write(file.read());
-      Serial.println("\n");
   }
+  
   Serial.println("\n");
 
   file.close();
@@ -598,7 +626,7 @@ bool isApprovedUser(int targetFingerprint) {
   DynamicJsonDocument doc(1024);
   File file = SPIFFS.open(path, "r");
   if (!file) {
-    Serial.println("isApprovedUser --- Failed to open file for reading");
+    Serial.println("isApprovedUser-------- Failed to open file for reading");
     return false;
   }
 
@@ -615,7 +643,7 @@ bool isApprovedUser(int targetFingerprint) {
     int fingerprint = userObj["fingerprintID"];
     if (fingerprint == targetFingerprint) {
       bool isApproved = userObj["isApproved"];
-      Serial.println("is appprooooveeeeedddddddd>>>>");
+      Serial.println("is user approvedd?? ");
       Serial.println(isApproved);
       return isApproved;
     }
@@ -663,21 +691,22 @@ void updatingTheTimeForApprovedUser(int targetFingerprint) {
 
 void printJsonFileContent(const char* filename) {
   Serial.println("print content: ");
-    File file = SPIFFS.open(path, "r");
-    if(!file){
+  File file = SPIFFS.open(path, "r");
+  if(!file) {
     Serial.println("Failed to open file for reading");
     return;
-    }
+  }
   
   Serial.println("File Content:");
   while(file.available()){
     Serial.write(file.read());
   }
+  
   file.close();
 }
 
 void initiatefile(){
-DynamicJsonDocument doc(10000);
+  DynamicJsonDocument doc(10000);
   
   // Populate the data document with {key: value} pairs
   for (int i = 1; i <= 162; ++i) {
@@ -745,6 +774,105 @@ int getIDForFingerPrint() {
   */
   return -1;
 }
+/*
+void sendJSONFileToFireBase() {
+  DynamicJsonDocument doc(1024);
+  File file = SPIFFS.open(path, "r");
+  if (!file) {
+    Serial.println("Failed to read JSON from file");
+    return;
+  }
+
+  deserializeJson(doc, file);
+  file.close();
+
+  String jsonString;
+  serializeJson(doc, jsonString);
+
+  
+  HTTPClient http;
+
+  //String url = String(storageBucket) + "users.json" + "?auth=" + API_KEY;
+  String url = "https://firebasestorage.googleapis.com/v0/b/" + String(storageBucket) + "/o" + "users.json" + "?key=" + API_KEY;
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+
+  int httpResponseCode = http.POST(jsonString);
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+  } else {
+    Serial.println("Error sending data to Firebase");
+  }
+
+  http.end();
+  
+}
+*/
+
+void sendDataToFirestore() {
+  File file = SPIFFS.open(path, "r");
+  if (!file) {
+    Serial.println("Failed to read JSON from file");
+    return;
+  }
+  DynamicJsonDocument doc(file.size());
+  deserializeJson(doc, file);
+  file.close();
+
+  // {fingerprintID:USER_DATA, ...}
+  /*std::map<String, JsonObject> users;
+
+
+  JsonObject root = doc.as<JsonObject>();
+  for (const JsonPair& pair : root) {
+    String fingerprintId = pair.key().c_str();
+    JsonObject userData = pair.value().as<JsonObject>();
+    users[fingerprintId] = userData;
+  }
+
+  for (const auto& user : users) {
+    Serial.print("Fingerprint ID: ");
+    Serial.println(user.first);
+
+    Serial.print("User ID: ");
+    Serial.println(user.second["id"].as<String>());
+
+    Serial.print("Is Approved: ");
+    Serial.println(user.second["isApproved"].as<bool>());
+
+    Serial.print("Is Appending: ");
+    Serial.println(user.second["isAppending"].as<bool>());
+
+    //Serial.print("Current Time: ");
+    //Serial.println(user.second["time"].as<time_t>());
+
+    Serial.println();
+    */
+
+    
+    
+    for (const auto& user : users) {
+      if (Firebase.Firestore.createDocument("users", user.first, user.second)) {
+        Serial.println("Data sent to Firestore");
+      } else {
+        Serial.println("Failed to send data to Firestore");
+      }
+    }
+  }
+}
+
+void printSPIFFSfiles() {
+  File root = SPIFFS.open("/");
+  File file = root.openNextFile();
+  Serial.println("\n");
+  while(file){
+    Serial.print("FILE: ");
+    Serial.println(file.name());
+    file = root.openNextFile();
+  }
+  Serial.println("\n");
+}
 
 void loop() {
   display.clearDisplay();
@@ -783,9 +911,12 @@ void loop() {
     fingerPrintID = getFingerprintEnroll();
     id_str = GetIdFromKeypad();
     current_time = now();
-
+    printSPIFFSfiles();
     if (id > 0 && id <= 162) {
       saveUserDataToFile(id, id_str, true, false, current_time);
+      //sendJSONFileToFireBase();
+      sendDataToFirestore();
+      printSPIFFSfiles();
     }
     else {
       Serial.println("there is no avalibe place in the system\n");
@@ -793,7 +924,7 @@ void loop() {
   } else if (FingerID > 0)  {
     if (isApprovedUser(FingerID)) {
       updatingTheTimeForApprovedUser(fingerPrintID);
-
+      
       setColor(0, 255, 0);
       delay(1000);
       display.println("Welcome!\n");
@@ -812,10 +943,9 @@ void loop() {
       delay(1000);
       Serial.println("\nYou are in the pending list mannn!, wait until the ceo accept your request\n");
       printJsonFileContent(path);
+      printSPIFFSfiles();
     }
   }
   display.display();
   delay(1000); // Delay to prevent rapid fingerprint reading
-
-  
 }

@@ -14,14 +14,14 @@ FirebaseData firebaseData;
 
 void setup() {
     // Initialize Wi-Fi
-    WiFi.begin(ssid, password);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
         Serial.println("Connecting to WiFi...");
     }
     
     // Initialize Firebase
-    Firebase.begin(apiKey, storageBucket);
+    Firebase.begin(API_KEY, storageBucket);
 }
 
 void loop() {
