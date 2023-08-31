@@ -8,8 +8,58 @@
 #define API_KEY "AIzaSyCQOPaLIyCOJI71ASLu-DvJTlsbGsqRupA"
 
 const char* storageBucket = "gs://biometric-attendance-sys-1deca.appspot.com";
-const char* filePath = "/data_users.json";
+//const char* filePath = "/data_users.json";
 
+FirebaseData firebaseData;
+
+void setup() {
+    // Initialize Wi-Fi
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.println("Connecting to WiFi...");
+    }
+    
+    // Initialize Firebase
+    Firebase.begin(apiKey, storageBucket);
+}
+
+void loop() {
+  // Upload a file
+  uploadFile("example.txt", "Hello, Firebase Cloud Storage!");
+
+  // Download and print the uploaded file
+  String downloadedContent = downloadFile("example.txt");
+  Serial.println("Downloaded Content:");
+  Serial.println(downloadedContent);
+
+  delay(5000); // Wait for 5 seconds before next loop iteration
+}
+
+void uploadFile(const String& fileName, const String& fileContent) {
+  String storagePath = "/" + fileName;
+
+  if (Firebase.putString(firebaseData, storagePath, fileContent)) {
+    Serial.println("File uploaded successfully!");
+  } else {
+    Serial.println("File upload failed.");
+  }
+}
+
+String downloadFile(const String& fileName) {
+  String storagePath = "/" + fileName;
+
+  if (Firebase.getString(firebaseData, storagePath)) {
+    return firebaseData.stringData();
+  } else {
+    Serial.println("File download failed.");
+    return "";
+  }
+}
+
+
+
+/*
 //Define Firebase Data objects
 FirebaseData fbdo;
 FirebaseAuth auth;
@@ -98,4 +148,4 @@ void loop() {
   }
 }
 
-}
+}*/
