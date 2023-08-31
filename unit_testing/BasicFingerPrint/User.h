@@ -13,6 +13,7 @@ private:
 	string id;              // 9 digits
 	uint8_t fingerprint_id; // finger print id 
 	bool is_approved;       
+  bool is_appending;
   time_t current_time;
 
 public:
@@ -29,6 +30,14 @@ public:
 		is_approved = false;
 	}
 
+  	void setUserAppendingOn() {
+		is_appending = true;
+	}
+
+	void setUserAppendingOff() {
+		is_appending = false;
+	}
+
   void setFingerPrintID(uint8_t finger_id) {
 		fingerprint_id = fingerprint_id;
 	}
@@ -43,6 +52,10 @@ public:
 
   bool isUserApproved() {
     return is_approved;
+  }
+
+  bool isUserAppending() {
+    return is_appending;
   }
 
   uint8_t getFingerprintID() {

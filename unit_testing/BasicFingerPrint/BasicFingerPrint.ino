@@ -12,6 +12,10 @@
 #include <vector>
 #include <algorithm>
 #include <Keypad.h>
+#include <TimeLib.h> 
+#include "SPIFFS.h"
+#include <ArduinoJson.h>
+
 
 // Pins connected to the fingerprint sensor
 #define FINGERPRINT_RX_PIN 16
@@ -48,18 +52,24 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Keypad customKeypad = Keypad( makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
 
 int FingerID; // The Fingerprint ID from the scanner
-vector<User> pending_users;
-vector<User> approved_users;
 String inputString = "";
-bool id_arr[161] = {false}; //fingerprint id 
+bool id_arr[162] = {false}; //fingerprint id 
 uint8_t id;
+const int MAX_USERS = 162;
+time_t current_time;
+uint8_t fingerPrintID;
+String id_str;
+const char* path = "/data_users.json";
 
+void fingerPrintSensorClear();
+void initiatefile();
 
+/*
 typedef struct firebaseUserDetails_t {
   uint8_t fingerprint_id;
   bool is_approval;
 } FB_User;
-
+*/
 void setup() {
   Serial.begin(115200);
   pinMode(redPin, OUTPUT);
@@ -78,7 +88,23 @@ void setup() {
   display.display();
   delay(2000); // Pause for 2 seconds
   display.clearDisplay();
+
+  bool success = SPIFFS.begin();
+  SPIFFS.format();
   
+  if (success) {
+    Serial.println("File system mounted with success");
+  } else {
+    Serial.println("Error mounting the file system");
+    return;
+  }
+  /*initiatefile();*/
+  /*
+  if (SPIFFS.format()) {
+    Serial.println("SPIFFS formatted successfully");
+  } else {
+    Serial.println("Failed to format SPIFFS");
+  }*/
   // set the data rate for the sensor serial port
   fingerSerial.begin(57600, SERIAL_8N1, FINGERPRINT_RX_PIN, FINGERPRINT_TX_PIN);
   Serial.println("\n\nAdafruit finger detect test");
@@ -95,19 +121,31 @@ void setup() {
     display.display();
     while (1) { delay(1); }
   }
-  
+
+  //fingerPrintSensorClear(); // very importantttt 
   finger.getTemplateCount();
   Serial.print("Sensor contains "); Serial.print(finger.templateCount); Serial.println(" templates");
   Serial.println("Waiting for valid finger...");
+
+
+  Serial.println("Files stored in SPIFFS:");
+  File root = SPIFFS.open("/");
+  File file = root.openNextFile();
+  while (file) {
+    Serial.println(file.name());
+    file = root.openNextFile();
+  }
 }
 
-int getIDForFingerPrint() {
-  for (int current = 0; current < 161; current++) {
-    if (id_arr[current] == false) {
-      return current + 1;
+void fingerPrintSensorClear() {
+  for (int i = 1; i <= 162; ++i) {
+    if (finger.deleteModel(i) == FINGERPRINT_OK) {
+      Serial.println("Template deleted: " + String(i));
+    } else {
+      Serial.println("Failed to delete template: " + String(i));
     }
-   }
-   return -1;
+    delay(100); // Add a small delay between deletions
+  }
 }
 
 int getFingerprintID() {
@@ -202,14 +240,6 @@ void DisplayFingerprintID(){
   }
 }
 
-bool isApprovedUser(uint8_t targetId) {
-  for (User user : approved_users) {
-    if (user.getFingerprintID() == targetId && user.isUserApproved()) {
-      return true;
-    }
-  }
-  return false;
-}
 
 String GetIdFromKeypad() {
   display.clearDisplay();
@@ -217,7 +247,7 @@ String GetIdFromKeypad() {
   display.setTextColor(WHITE);
   display.setCursor(0, 10);
   // Display static text
-  display.println("Begin");
+  display.println("Please enter ID:");
   display.display();
 
 
@@ -297,6 +327,7 @@ String GetIdFromKeypad() {
       }
     }
   }
+  return "";
 }
 
 uint8_t getFingerprintEnroll() {
@@ -471,69 +502,7 @@ uint8_t getFingerprintEnroll() {
     Serial.println("Unknown error");
     return p;
   }
-}
-
-// add fingerprint to memory and get the id from the user
-void addFingerprintAndUserIDToList(User current_user) {
-  uint8_t fingerPrintID = getFingerprintEnroll();
-  String id_str = GetIdFromKeypad();
-  current_user.setID(id_str.c_str());
-  current_user.setFingerPrintID(fingerPrintID);
-  current_user.setCurrentTime();
-}
-
-User* getUserFromPendingList(uint8_t fingerprint_id) {
-  for (User user : pending_users) {
-    if (user.getFingerprintID() == fingerprint_id) {
-      return &user;
-    }
-  }
-  return nullptr;
-}
-
-void waitingUsersApproval(vector<FB_User> fb_vector) {
-  for (FB_User user : fb_vector) {
-    User* current_user = getUserFromPendingList(user.fingerprint_id);
-    if (current_user && user.is_approval) {
-      approved_users.push_back(*current_user);
-    }
-    else {
-      if (finger.deleteModel(user.fingerprint_id)) {
-        id_arr[user.fingerprint_id] = false;
-        Serial.println("Fingerprint deleted successfully");
-      } else {
-        Serial.println("Failed to delete fingerprint");
-      }
-    }
-  }
-}
-
-
-bool isApprovedUser(int user_fingerprintID) {
-  for (User& user : pending_users) {
-    //Serial.println(user_fingerprintID);
-    Serial.println(String(user.getID().c_str()));
-    if (user.getFingerprintID() == user_fingerprintID && user.getID() == "211585666") {
-      return true;
-    }
-  }
-  return false;
-  
-  /*
-  for (User& user : approved_users) {
-    if (user.getFingerprintID() == user_fingerprintID) {
-      return true;
-    }
-  }
-  return false;*/
-}
-
-void updatingTheTimeForApprovedUser(int fingerprint_id) {
-  for (User user : approved_users) {
-    if (user.getFingerprintID() == fingerprint_id) {
-      user.setCurrentTime();
-    }
-  }
+  return p;
 }
 
 
@@ -541,6 +510,241 @@ void setColor(int redValue, int greenValue, int blueValue) {
   analogWrite(redPin, redValue);
   analogWrite(greenPin, greenValue);
   analogWrite(bluePin, blueValue);
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+void saveUserDataToFile(int fingerprint_id, String id, bool is_appending, bool is_approved, time_t curr_time) {
+    File file = SPIFFS.open(path, "a");
+    if (!file) {
+        Serial.println("Failed to open file for writing");
+        return;
+    }
+
+    Serial.println("saveUserDataToFile---------- File opened successfully");
+
+    DynamicJsonDocument doc(1024);
+
+    JsonObject userObj = doc.createNestedObject();
+    userObj["fingerprintID"] = fingerprint_id;
+    userObj["id"] = id;
+    userObj["isApproved"] = is_approved;
+    userObj["isAppending"] = is_appending;
+    //userObj["time"] = curr_time;
+
+    if (serializeJson(doc, file)) {
+        Serial.println("saveUserDataToFile----------- Data written to file successfully");
+    } else {
+        Serial.println("saveUserDataToFile------------ Failed to write data to file");
+    }
+
+    file.close();
+
+    file = SPIFFS.open(path, "r");
+    if(!file){
+    Serial.println("Failed to open file for reading");
+    return;
+    }
+   Serial.println("\n");
+   Serial.println("File Content:");
+    while(file.available()){
+      Serial.write(file.read());
+      Serial.println("\n");
+  }
+  Serial.println("\n");
+
+  file.close();
+}
+
+// set approved true, isPennding to false, and update the time
+void updateUserApprovedON(int targetFingerprint) {
+    DynamicJsonDocument doc(1024);
+    File file = SPIFFS.open(path, "r");
+    if (!file) {
+        Serial.println("Failed to open file for reading");
+        return;
+    }
+
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+
+    if (error) {
+        Serial.println("Failed to read JSON");
+        return;
+    }
+
+    for (JsonObject userObj : doc.as<JsonArray>()) {
+        int fingerprint = userObj["fingerprintID"];
+        if (fingerprint == targetFingerprint) {
+            userObj["isApproved"] = true;
+            userObj["isAppending"] = false;
+            userObj["time"] = now(); 
+            break; // Stop iterating once we find the target user
+        }
+    }
+
+    File outFile = SPIFFS.open(path, "w");
+    if (!outFile) {
+        Serial.println("Failed to open file for writing");
+        return;
+    }
+
+    serializeJson(doc, outFile);
+    outFile.close();
+
+    Serial.println("Updated isApproved for user with target fingerprint.");
+}
+
+
+bool isApprovedUser(int targetFingerprint) {
+  DynamicJsonDocument doc(1024);
+  File file = SPIFFS.open(path, "r");
+  if (!file) {
+    Serial.println("isApprovedUser --- Failed to open file for reading");
+    return false;
+  }
+
+  DeserializationError error = deserializeJson(doc, file);
+  file.close();
+
+  if (error) {
+    Serial.println("heree");
+    Serial.println("Failed to read JSON");
+    return false;
+  }
+
+  for (JsonObject userObj : doc.as<JsonArray>()) {
+    int fingerprint = userObj["fingerprintID"];
+    if (fingerprint == targetFingerprint) {
+      bool isApproved = userObj["isApproved"];
+      Serial.println("is appprooooveeeeedddddddd>>>>");
+      Serial.println(isApproved);
+      return isApproved;
+    }
+  }
+
+  return false; // User not found
+}
+
+
+void updatingTheTimeForApprovedUser(int targetFingerprint) {
+  DynamicJsonDocument doc(1024);
+  File file = SPIFFS.open(path, "r");
+  if (!file) {
+    Serial.println("Failed to open file for reading");
+    return;
+  }
+
+  DeserializationError error = deserializeJson(doc, file);
+  file.close();
+
+  if (error) {
+    Serial.println("Failed to read JSON");
+    return;
+  }
+
+  for (JsonObject userObj : doc.as<JsonArray>()) {
+    int fingerprint = userObj["fingerprintID"];
+    if (fingerprint == targetFingerprint) {
+      userObj["timestamp"] = now(); // Update the time
+      break; // Stop iterating once we find the target user
+    }
+  }
+
+    File outFile = SPIFFS.open(path, "w");
+    if (!outFile) {
+        Serial.println("Failed to open file for writing");
+        return;
+    }
+
+    serializeJson(doc, outFile);
+    outFile.close();
+
+    Serial.println("Updated time for user with target fingerprint.");
+}
+
+void printJsonFileContent(const char* filename) {
+  Serial.println("print content: ");
+    File file = SPIFFS.open(path, "r");
+    if(!file){
+    Serial.println("Failed to open file for reading");
+    return;
+    }
+  
+  Serial.println("File Content:");
+  while(file.available()){
+    Serial.write(file.read());
+  }
+  file.close();
+}
+
+void initiatefile(){
+DynamicJsonDocument doc(10000);
+  
+  // Populate the data document with {key: value} pairs
+  for (int i = 1; i <= 162; ++i) {
+    JsonObject entry = doc.createNestedObject();
+    entry["key"] = i;
+    entry["value"] = false;
+  }
+
+  File jsonFile = SPIFFS.open("/fingerprintID.json", "w");
+  if (!jsonFile) {
+    Serial.println("Failed to open fingerprintID.json for writing");
+    return;
+  }
+
+  serializeJsonPretty(doc, jsonFile); // Use serializeJsonPretty for indentation
+  jsonFile.close();
+
+  Serial.println("JSON data has been written to 'fingerprintID.json'");
+}
+
+
+int getIDForFingerPrint() {
+  for (int current = 0; current <= 162; current++){
+    if (id_arr[current] == false){
+      return current+1;
+    }
+  }
+  /*
+  File dataFile = SPIFFS.open("/fingerprintID.json", "r+");
+  if (!dataFile) {
+    Serial.println("Failed to open data.json");
+    return -1;
+  }
+  Serial.println("File Content:");
+  while(dataFile.available()){
+    Serial.write(dataFile.read());
+  }
+  size_t size = dataFile.size();
+  std::unique_ptr<char[]> buf(new char[size]);
+
+  dataFile.readBytes(buf.get(), size);
+  dataFile.close();
+ 
+  DynamicJsonDocument doc(10000);
+  DeserializationError error = deserializeJson(doc, buf.get());
+  if (error) {
+    Serial.println("Failed to parse JSON");
+    Serial.println(error.c_str());
+    return -1;
+  }
+
+  for (JsonVariant entry : doc.as<JsonArray>()) {
+    int key = entry["key"];
+    bool value = entry["value"];
+
+    if (!value) {
+      Serial.print("First key with false value: ");
+      Serial.println(key);
+      entry["value"] = true;
+      return key;
+      break;
+    }
+  }
+  return -1;
+  */
+  return -1;
 }
 
 void loop() {
@@ -559,7 +763,7 @@ void loop() {
 
   delay(50); 
   
-  User current_user;
+  //User current_user;
   //Didn't find a match
   if (FingerID == -1) {
     setColor(255, 0, 0);
@@ -571,20 +775,30 @@ void loop() {
     display.setCursor(0, 30);
     display.println("are not registered.");
     display.display();
-	
+  
     delay(3000);
-	
+  
     id = getIDForFingerPrint();
     id_arr[id - 1] = true;
-    addFingerprintAndUserIDToList(current_user);
-    pending_users.push_back(current_user);    
+
+    fingerPrintID = getFingerprintEnroll();
+    id_str = GetIdFromKeypad();
+    current_time = now();
+
+    if (id > 0 && id <= 162) {
+      saveUserDataToFile(id, id_str, true, false, current_time);
+    }
+    else {
+      Serial.println("there is no avalibe place in the system\n");
+    }
   } else if (FingerID > 0)  {
     if (isApprovedUser(FingerID)) {
-      updatingTheTimeForApprovedUser(FingerID);
-	  
+      updatingTheTimeForApprovedUser(fingerPrintID);
+
       setColor(0, 255, 0);
       delay(1000);
       display.println("Welcome!\n");
+
     } else {
       setColor(255, 0, 255);
       display.clearDisplay();
@@ -597,14 +811,12 @@ void loop() {
       display.println("are in the waiting   list");
       display.display();
       delay(1000);
-      Serial.println("You are in the pending list mannn!, wait until the ceo accept your request\n");
+      Serial.println("\nYou are in the pending list mannn!, wait until the ceo accept your request\n");
+      printJsonFileContent(path);
     }
   }
   display.display();
   delay(1000); // Delay to prevent rapid fingerprint reading
 
-  for (User& user: pending_users) {
-    Serial.print(user.getFingerprintID());
-  }
-
+  
 }
