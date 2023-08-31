@@ -64,17 +64,13 @@ const char* path = "/data_users.json";
 void fingerPrintSensorClear();
 void initiatefile();
 
-/*
-typedef struct firebaseUserDetails_t {
-  uint8_t fingerprint_id;
-  bool is_approval;
-} FB_User;
-*/
+
 void setup() {
   Serial.begin(115200);
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
   pinMode(bluePin, OUTPUT);
+  
   //-----------initiate OLED display-------------
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x64
@@ -89,6 +85,7 @@ void setup() {
   delay(2000); // Pause for 2 seconds
   display.clearDisplay();
 
+  //----------- initiate SPIFFS -------------
   bool success = SPIFFS.begin();
   SPIFFS.format();
   
@@ -98,6 +95,7 @@ void setup() {
     Serial.println("Error mounting the file system");
     return;
   }
+  
   /*initiatefile();*/
   /*
   if (SPIFFS.format()) {
@@ -105,6 +103,7 @@ void setup() {
   } else {
     Serial.println("Failed to format SPIFFS");
   }*/
+  
   // set the data rate for the sensor serial port
   fingerSerial.begin(57600, SERIAL_8N1, FINGERPRINT_RX_PIN, FINGERPRINT_TX_PIN);
   Serial.println("\n\nAdafruit finger detect test");
@@ -209,7 +208,7 @@ int getFingerprintID() {
   return finger.fingerID;
 }
 
-
+/*
 void DisplayFingerprintID(){
   //Fingerprint has been detected
   if (FingerID > 0) {
@@ -239,7 +238,7 @@ void DisplayFingerprintID(){
     display.display();
   }
 }
-
+*/
 
 String GetIdFromKeypad() {
   display.clearDisplay();
