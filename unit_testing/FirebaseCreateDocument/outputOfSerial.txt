@@ -1,0 +1,275 @@
+.......................................
+Connected with IP: 172.20.10.3
+
+Firebase Client v4.3.20
+
+Token info: type = id token (GITKit token), status = on request
+Token info: type = id token (GITKit token), status = ready
+Create a document... ok
+{
+  "name": "projects/biometric-attendance-sys-1deca/databases/(default)/documents/a0/b0",
+  "fields": {
+    "myLatLng": {
+      "geoPointValue": {
+        "latitude": 1.486284,
+        "longitude": 23.678198
+      }
+    },
+    "myInteger": {
+      "integerValue": "849"
+    },
+    "myNull": {
+      "nullValue": null
+    },
+    "myMap": {
+      "mapValue": {
+        "fields": {
+          "mass": {
+            "stringValue": "1.3kg"
+          },
+          "name": {
+            "stringValue": "wrench"
+          },
+          "count": {
+            "integerValue": "3"
+          }
+        }
+      }
+    },
+    "myBytes": {
+      "bytesValue": "aGVsbG8="
+    },
+    "myTimestamp": {
+      "timestampValue": "2014-10-02T15:01:23Z"
+    },
+    "myBool": {
+      "booleanValue": true
+    },
+    "myArray": {
+      "arrayValue": {
+        "values": [
+          {
+            "stringValue": "test"
+          },
+          {
+            "integerValue": "20"
+          },
+          {
+            "booleanValue": true
+          }
+        ]
+      }
+    },
+    "myRef": {
+      "referenceValue": "projects/biometric-attendance-sys-1deca/databases/(default)/documents/coll_id/doc_id"
+    },
+    "myDouble": {
+      "doubleValue": 0.57
+    }
+  },
+  "createTime": "2023-08-31T14:52:16.213004Z",
+  "updateTime": "2023-08-31T14:52:16.213004Z"
+}
+
+
+Create a document... ok
+{
+  "name": "projects/biometric-attendance-sys-1deca/databases/(default)/documents/a0/b1",
+  "fields": {
+    "myArray": {
+      "arrayValue": {
+        "values": [
+          {
+            "stringValue": "test"
+          },
+          {
+            "integerValue": "20"
+          },
+          {
+            "booleanValue": true
+          }
+        ]
+      }
+    },
+    "myTimestamp": {
+      "timestampValue": "2014-10-02T15:01:23Z"
+    },
+    "myBytes": {
+      "bytesValue": "aGVsbG8="
+    },
+    "myMap": {
+      "mapValue": {
+        "fields": {
+          "name": {
+            "stringValue": "wrench"
+          },
+          "count": {
+            "integerValue": "3"
+          },
+          "mass": {
+            "stringValue": "1.3kg"
+          }
+        }
+      }
+    },
+    "myNull": {
+      "nullValue": null
+    },
+    "myLatLng": {
+      "geoPointValue": {
+        "latitude": 1.486284,
+        "longitude": 23.678198
+      }
+    },
+    "myBool": {
+      "booleanValue": true
+    },
+    "myInteger": {
+      "integerValue": "916"
+    },
+    "myDouble": {
+      "doubleValue": 3.18
+    },
+    "myRef": {
+      "referenceValue": "projects/biometric-attendance-sys-1deca/databases/(default)/documents/coll_id/doc_id"
+    }
+  },
+  "createTime": "2023-08-31T14:53:14.969819Z",
+  "updateTime": "2023-08-31T14:53:14.969819Z"
+}
+
+
+Create a document... ok
+{
+  "name": "projects/biometric-attendance-sys-1deca/databases/(default)/documents/a0/b2",
+  "fields": {
+    "myNull": {
+      "nullValue": null
+    },
+    "myRef": {
+      "referenceValue": "projects/biometric-attendance-sys-1deca/databases/(default)/documents/coll_id/doc_id"
+    },
+    "myBytes": {
+      "bytesValue": "aGVsbG8="
+    },
+    "myBool": {
+      "booleanValue": true
+    },
+    "myInteger": {
+      "integerValue": "502"
+    },
+    "myTimestamp": {
+      "timestampValue": "2014-10-02T15:01:23Z"
+    },
+    "myLatLng": {
+      "geoPointValue": {
+        "latitude": 1.486284,
+        "longitude": 23.678198
+      }
+    },
+    "myArray": {
+      "arrayValue": {
+        "values": [
+          {
+            "stringValue": "test"
+          },
+          {
+            "integerValue": "20"
+          },
+          {
+            "booleanValue": true
+          }
+        ]
+      }
+    },
+    "myDouble": {
+      "doubleValue": 2.02
+    },
+    "myMap": {
+      "mapValue": {
+        "fields": {
+          "count": {
+            "integerValue": "3"
+          },
+          "mass": {
+            "stringValue": "1.3kg"
+          },
+          "name": {
+            "stringValue": "wrench"
+          }
+        }
+      }
+    }
+  },
+  "createTime": "2023-08-31T14:54:14.262792Z",
+  "updateTime": "2023-08-31T14:54:14.262792Z"
+}
+
+
+Create a document... ok
+{
+  "name": "projects/biometric-attendance-sys-1deca/databases/(default)/documents/a0/b3",
+  "fields": {
+    "myRef": {
+      "referenceValue": "projects/biometric-attendance-sys-1deca/databases/(default)/documents/coll_id/doc_id"
+    },
+    "myBytes": {
+      "bytesValue": "aGVsbG8="
+    },
+    "myInteger": {
+      "integerValue": "846"
+    },
+    "myArray": {
+      "arrayValue": {
+        "values": [
+          {
+            "stringValue": "test"
+          },
+          {
+            "integerValue": "20"
+          },
+          {
+            "booleanValue": true
+          }
+        ]
+      }
+    },
+    "myDouble": {
+      "doubleValue": 4.96
+    },
+    "myMap": {
+      "mapValue": {
+        "fields": {
+          "mass": {
+            "stringValue": "1.3kg"
+          },
+          "name": {
+            "stringValue": "wrench"
+          },
+          "count": {
+            "integerValue": "3"
+          }
+        }
+      }
+    },
+    "myNull": {
+      "nullValue": null
+    },
+    "myTimestamp": {
+      "timestampValue": "2014-10-02T15:01:23Z"
+    },
+    "myBool": {
+      "booleanValue": true
+    },
+    "myLatLng": {
+      "geoPointValue": {
+        "latitude": 1.486284,
+        "longitude": 23.678198
+      }
+    }
+  },
+  "createTime": "2023-08-31T14:55:16.372392Z",
+  "updateTime": "2023-08-31T14:55:16.372392Z"
+}
+
+
