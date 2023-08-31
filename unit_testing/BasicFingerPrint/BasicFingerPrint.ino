@@ -18,6 +18,7 @@
 #include <map>
 #include <Firebase_ESP_Client.h>
 #include <addons/TokenHelper.h>
+#include <Arduino.h>
 
 
 // Pins connected to the fingerprint sensor
@@ -63,11 +64,17 @@ time_t current_time;
 uint8_t fingerPrintID;
 String id_str;
 const char* path = "/data_users.json";
+FirebaseJson content;
 
-// Firebase configuration
-const char* API_KEY = "AIzaSyCQOPaLIyCOJI71ASLu-DvJTlsbGsqRupA";
-const char* FIREBASE_PROJECT_ID = "biometric-attendance-sys-1deca";
 
+/* 2. Define the API Key */
+/* 3. Define the project ID */
+#define API_KEY "AIzaSyCQOPaLIyCOJI71ASLu-DvJTlsbGsqRupA"
+#define FIREBASE_PROJECT_ID "biometric-attendance-sys-1deca"
+
+/* 4. Define the user Email and password that alreadey registerd or added in your project */
+#define USER_EMAIL "biometproj@gmail.com"
+#define USER_PASSWORD "12345678project"
 
 void fingerPrintSensorClear();
 void initiatefile();
@@ -76,7 +83,6 @@ void printSPIFFSfiles();
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
-bool signupOK = false;
 
 void setup() {
   Serial.begin(115200);
@@ -145,17 +151,29 @@ void setup() {
     Serial.println("Connecting to WiFi...");
   }
 
-  config.api_key = API_KEY;
-  /* Sign up */
-  if (Firebase.signUp(&config, &auth, "", "")){
-    Serial.println("ok");
-    signupOK = true;
-  }
-  else{
-    Serial.printf("%s\n", config.signer.signupError.message.c_str());
-  }
-  config.token_status_callback = tokenStatusCallback; //see addons/TokenHelper.h
+  Serial.println();
+  Serial.print("Connected with IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println();
 
+  Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
+  
+  config.api_key = API_KEY;
+
+  /* Assign the user sign in credentials */
+  auth.user.email = USER_EMAIL;
+  auth.user.password = USER_PASSWORD;
+
+  // The WiFi credentials are required for Pico W
+  // due to it does not have reconnect feature.
+  #if defined(ARDUINO_RASPBERRY_PI_PICO_W)
+  config.wifi.clearAP();
+  config.wifi.addAP(WIFI_SSID, WIFI_PASSWORD);
+  #endif
+
+  /* Assign the callback function for the long running token generation task */
+  config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
+  
   Firebase.begin(&config, &auth);
     
   Firebase.reconnectWiFi(true);
@@ -850,8 +868,32 @@ void sendDataToFirestore() {
     Serial.println();
     */
 
+    String documentPath = "Users/user" + String(id); // id- fingerPrintID
+
+    String doc_path = "projects/";
+        doc_path += FIREBASE_PROJECT_ID;
+        doc_path += "/databases/(default)/documents/coll_id/doc_id"; // coll_id and doc_id are your collection id and document id
     
     
+    for (JsonObject userObj : doc.as<JsonArray>()) {
+        // map
+        content.set("fields/myMap/mapValue/fields/FingerPrintID/uint8_t", userObj["fingerprintID"]);
+        content.set("fields/myMap/mapValue/fields/ID/stringValue", userObj["id"]);
+        content.set("fields/myMap/mapValue/fields/isAppending/booleanValue", userObj["isAppending"]);
+        content.set("fields/myMap/mapValue/fields/isApproved/booleanValue", userObj["isApproved"]);
+    }
+    // timestamp
+    content.set("fields/Time/timestampValue", "2014-10-02T15:01:23Z"); 
+
+
+    Serial.println("Create a document... ");
+
+    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), content.raw()))
+      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+    else 
+    Serial.println(fbdo.errorReason());
+
+    /*
     for (const auto& user : users) {
       if (Firebase.Firestore.createDocument("users", user.first, user.second)) {
         Serial.println("Data sent to Firestore");
@@ -859,7 +901,7 @@ void sendDataToFirestore() {
         Serial.println("Failed to send data to Firestore");
       }
     }
-  }
+    */
 }
 
 void printSPIFFSfiles() {
