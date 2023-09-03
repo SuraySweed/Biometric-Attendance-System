@@ -170,8 +170,8 @@ void loop()
                 Serial.println(fbdo.errorReason());
         }
 
-        String documentPath = "info/countries";
-        String mask = "Singapore";
+        String documentPath = "ApprovedUsers/user0";
+        String mask = "data";
 
         // If the document path contains space e.g. "a b c/d e f"
         // It should encode the space as %20 then the path will be "a%20b%20c/d%20e%20f"
@@ -180,15 +180,37 @@ void loop()
 
         if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), mask.c_str())){
             Serial.println(fbdo.payload());
-            DynamicJsonDocument doc(1024);
+            DynamicJsonDocument doc(10000);
             // You can use a String as your JSON input.
             // WARNING: the string in the input  will be duplicated in the JsonDocument.
             deserializeJson(doc, fbdo.payload());
             JsonObject obj = doc.as<JsonObject>();
-            Serial.println(String(obj[String("population")]));
+            Serial.println(obj["fields"]["data"]["mapValue"]["fields"]["id"].as<String>());
+            
+            //Serial.println(doc["feild"]["id"].as<String>());
             /*savePayloadToFile(fbdo.payload());
             File file = SPIFFS.open("/payload.json", "r");
             println()*/
+            /*
+            String key = "stringValue";
+            String extractedValue;
+            String jsonString = obj["fields"]["id"].as<String>();
+            
+            int keyIndex = jsonString.indexOf(key);
+            
+            if (keyIndex != -1) {
+              int startIndex = jsonString.indexOf(":", keyIndex) + 1;
+              int endIndex = jsonString.indexOf("}", startIndex);
+              
+              if (startIndex != -1 && endIndex != -1) {
+                extractedValue = jsonString.substring(startIndex, endIndex);
+                extractedValue.trim(); // Remove leading/trailing whitespace if any
+              }
+            }
+            
+            //Serial.begin(9600);
+            Serial.println("Extracted value: " + extractedValue);
+            */
         }
         else
             Serial.println(fbdo.errorReason());

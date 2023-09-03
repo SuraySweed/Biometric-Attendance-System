@@ -18,7 +18,7 @@
 #include <map>
 #include <Firebase_ESP_Client.h>
 #include <addons/TokenHelper.h>
-#include <Arduino.h>
+//#include <Arduino.h>
 
 
 // Pins connected to the fingerprint sensor
@@ -80,6 +80,7 @@ void fingerPrintSensorClear();
 void initiatefile();
 void printSPIFFSfiles();
 
+// Define Firebase Data object
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
@@ -141,6 +142,7 @@ void setup() {
   }
 
   //fingerPrintSensorClear(); // very importantttt 
+
   
   finger.getTemplateCount();
   Serial.print("Sensor contains "); Serial.print(finger.templateCount); Serial.println(" templates");
@@ -164,16 +166,11 @@ void setup() {
   auth.user.email = USER_EMAIL;
   auth.user.password = USER_PASSWORD;
 
-  // The WiFi credentials are required for Pico W
-  // due to it does not have reconnect feature.
-  #if defined(ARDUINO_RASPBERRY_PI_PICO_W)
-  config.wifi.clearAP();
-  config.wifi.addAP(WIFI_SSID, WIFI_PASSWORD);
-  #endif
-
   /* Assign the callback function for the long running token generation task */
   config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
-  
+
+  fbdo.setResponseSize(2048);
+
   Firebase.begin(&config, &auth);
     
   Firebase.reconnectWiFi(true);
@@ -254,37 +251,6 @@ int getFingerprintID() {
   return finger.fingerID;
 }
 
-/*
-void DisplayFingerprintID(){
-  //Fingerprint has been detected
-  if (FingerID > 0) {
-    display.clearDisplay();
-    display.drawBitmap( 34, 0, FinPr_valid_bits, FinPr_valid_width, FinPr_valid_height, WHITE);
-    display.display();
-  }
-  
-  //No finger detected
-  else if (FingerID == 0) {
-    display.clearDisplay();
-    display.drawBitmap( 32, 0, FinPr_start_bits, FinPr_start_width, FinPr_start_height, WHITE);
-    display.display();
-  }
-  
-  //Didn't find a match
-  else if (FingerID == -1) {
-    display.clearDisplay();
-    display.drawBitmap( 34, 0, FinPr_invalid_bits, FinPr_invalid_width, FinPr_invalid_height, WHITE);
-    display.display();
-  }
-  
-  //Didn't find the scanner or there an error
-  else if (FingerID == -2) {
-    display.clearDisplay();
-    display.drawBitmap( 32, 0, FinPr_failed_bits, FinPr_failed_width, FinPr_failed_height, WHITE);
-    display.display();
-  }
-}
-*/
 
 String GetIdFromKeypad() {
   display.clearDisplay();
@@ -558,7 +524,7 @@ void setColor(int redValue, int greenValue, int blueValue) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////
-void saveUserDataToFile(int fingerprint_id, String id, bool is_appending, bool is_approved, time_t curr_time) {
+void saveUserDataToFile(int fingerprint_id, String id, bool is_pending, bool is_approved, time_t curr_time) {
     File file = SPIFFS.open(path, "a");
     if (!file) {
         Serial.println("Failed to open file for writing");
@@ -573,7 +539,7 @@ void saveUserDataToFile(int fingerprint_id, String id, bool is_appending, bool i
     userObj["fingerprintID"] = fingerprint_id;
     userObj["id"] = id;
     userObj["isApproved"] = is_approved;
-    userObj["isAppending"] = is_appending;
+    userObj["isPending"] = is_pending;
     //userObj["time"] = curr_time;
 
     if (serializeJson(doc, file)) {
@@ -838,70 +804,32 @@ void sendDataToFirestore() {
   deserializeJson(doc, file);
   file.close();
 
-  // {fingerprintID:USER_DATA, ...}
-  /*std::map<String, JsonObject> users;
-
-
-  JsonObject root = doc.as<JsonObject>();
-  for (const JsonPair& pair : root) {
-    String fingerprintId = pair.key().c_str();
-    JsonObject userData = pair.value().as<JsonObject>();
-    users[fingerprintId] = userData;
-  }
-
-  for (const auto& user : users) {
-    Serial.print("Fingerprint ID: ");
-    Serial.println(user.first);
-
-    Serial.print("User ID: ");
-    Serial.println(user.second["id"].as<String>());
-
-    Serial.print("Is Approved: ");
-    Serial.println(user.second["isApproved"].as<bool>());
-
-    Serial.print("Is Appending: ");
-    Serial.println(user.second["isAppending"].as<bool>());
-
-    //Serial.print("Current Time: ");
-    //Serial.println(user.second["time"].as<time_t>());
-
-    Serial.println();
-    */
-
-    String documentPath = "Users/user" + String(id); // id- fingerPrintID
-
-    String doc_path = "projects/";
-        doc_path += FIREBASE_PROJECT_ID;
-        doc_path += "/databases/(default)/documents/coll_id/doc_id"; // coll_id and doc_id are your collection id and document id
+    if (Firebase.ready()) {
+      for (JsonObject userObj : doc.as<JsonArray>()) {
+          // map
+          String documentPath = "Users/user" + userObj["fingerprintID"].as<String>(); // id- fingerPrintID
+  
+          String doc_path = "projects/";
+          doc_path += FIREBASE_PROJECT_ID;
+          doc_path += "/databases/(default)/documents/coll_id/doc_id"; // coll_id and doc_id are your collection id and document id
+          
+          content.set("fields/myMap/mapValue/fields/FingerPrintID/integerValue", userObj["fingerprintID"].as<String>());
+          content.set("fields/myMap/mapValue/fields/ID/stringValue", userObj["id"].as<String>());
+          content.set("fields/myMap/mapValue/fields/isPending/booleanValue", userObj["isApproved"].as<bool>());
+          content.set("fields/myMap/mapValue/fields/isApproved/booleanValue", userObj["isPending"].as<bool>());
+      
+      // timestamp
+        content.set("fields/Time/timestampValue", "2014-10-02T15:01:23Z"); 
     
     
-    for (JsonObject userObj : doc.as<JsonArray>()) {
-        // map
-        content.set("fields/myMap/mapValue/fields/FingerPrintID/uint8_t", userObj["fingerprintID"]);
-        content.set("fields/myMap/mapValue/fields/ID/stringValue", userObj["id"]);
-        content.set("fields/myMap/mapValue/fields/isAppending/booleanValue", userObj["isAppending"]);
-        content.set("fields/myMap/mapValue/fields/isApproved/booleanValue", userObj["isApproved"]);
-    }
-    // timestamp
-    content.set("fields/Time/timestampValue", "2014-10-02T15:01:23Z"); 
-
-
-    Serial.println("Create a document... ");
-
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), content.raw()))
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
-    else 
-    Serial.println(fbdo.errorReason());
-
-    /*
-    for (const auto& user : users) {
-      if (Firebase.Firestore.createDocument("users", user.first, user.second)) {
-        Serial.println("Data sent to Firestore");
-      } else {
-        Serial.println("Failed to send data to Firestore");
+        Serial.println("Create a document... ");
+    
+        if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), content.raw()))
+          Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+        else 
+        Serial.println(fbdo.errorReason());
       }
     }
-    */
 }
 
 void printSPIFFSfiles() {
