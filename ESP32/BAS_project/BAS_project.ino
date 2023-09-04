@@ -114,8 +114,10 @@ void connectToFireBase() {
 void connectToWifi() {
   WiFi.begin(ssid, password);
   // 25 seconds to connect to wifi
+  WifiStartTime = millis();
+
   while ((WiFi.status() != WL_CONNECTED) && (millis() - WifiStartTime < connectionTimeout || WifiStartTime == 0)) {
-    WifiStartTime = millis();
+    //WifiStartTime = millis();
     delay(1000);
 
     display.clearDisplay();
@@ -210,7 +212,7 @@ void setup() {
   connectToWifi();
 
 
-  Serial.println("Waiting for valid finger...");
+ // Serial.println("Waiting for valid finger...");
 }
 
 void fingerPrintSensorClear() {
@@ -992,6 +994,7 @@ bool isUserExistInFBApprovedList(int id) {
 }
 
 void loop() {
+  Serial.println("Waiting for valid finger...");
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
@@ -1107,6 +1110,7 @@ void loop() {
           reconnectTime = millis();
           connectToWifi();
       }
+     
     }
   }
   display.display();
