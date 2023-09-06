@@ -142,6 +142,9 @@ void connectToWifi() {
     Serial.println();
 
     connectToFireBase();
+    Serial.println("configure the time ");
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    Serial.println("\n");
   }
 }
 
@@ -560,7 +563,7 @@ void setColor(int redValue, int greenValue, int blueValue) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////
-void addUserToPendingUsersFile(int fingerprint_id, String id, bool is_pending, bool is_approved, time_t curr_time) {
+void addUserToPendingUsersFile(int fingerprint_id, String id, bool is_pending, bool is_approved, char* currentTimeStr) {
   File file = SPIFFS.open(pinding_users_path, "a");
   if (!file) {
     Serial.println("Failed to open file for writing");
@@ -576,7 +579,7 @@ void addUserToPendingUsersFile(int fingerprint_id, String id, bool is_pending, b
   userObj["id"] = id;
   userObj["isApproved"] = is_approved;
   userObj["isPending"] = is_pending;
-  //userObj["time"] = curr_time;
+  userObj["time"] = String(currentTimeStr);
 
   if (serializeJson(doc, file)) {
     Serial.println("addUserToPendingUsersFile----------- Data written to file successfully");
@@ -602,7 +605,7 @@ void addUserToPendingUsersFile(int fingerprint_id, String id, bool is_pending, b
   file.close();
 }
 
-void addUserToApprovedUsersFile(int fingerprint_id, String id, time_t curr_time) {
+void addUserToApprovedUsersFile(int fingerprint_id, String id, char* currentTimeStr) {
   DynamicJsonDocument doc(10000);
   File file = SPIFFS.open(approved_users_path, "r");
   if (!file) {
@@ -639,7 +642,7 @@ void addUserToApprovedUsersFile(int fingerprint_id, String id, time_t curr_time)
   JsonObject userObj2 = writedoc.createNestedObject();
   userObj2["FingerPrintID"] = fingerprint_id;
   userObj2["id"] = id;
-  //userObj2["time"] = curr_time;
+  userObj2["time"] = String(currentTimeStr);
 
   if (serializeJson(writedoc, file)) {
     Serial.println("addUserToApprovedUsersFile----------- Data written to file successfully");
@@ -916,7 +919,7 @@ void printSPIFFSfiles() {
 
 
 
-void addPendingUserToFireBase(int fingerprint_id, String id, bool is_pending, bool is_approved, time_t curr_time) {
+void addPendingUserToFireBase(int fingerprint_id, String id, bool is_pending, bool is_approved, char* currentTimeStr) {
   if (Firebase.ready()) {
 
     String documentPath = "PendingUsers/user" + String(fingerprint_id); // id- fingerPrintID
@@ -925,6 +928,8 @@ void addPendingUserToFireBase(int fingerprint_id, String id, bool is_pending, bo
     content.set("fields/data/mapValue/fields/id/stringValue", id.c_str());
     content.set("fields/data/mapValue/fields/isPending/booleanValue", is_pending);
     content.set("fields/data/mapValue/fields/isApproved/booleanValue", is_approved);
+    content.set("fields/data/mapValue/fields/time/stringValue", currentTimeStr);
+
 
     /*
       content.set("fields/FingerPrintID/integerValue", String(fingerprint_id).c_str());
@@ -962,7 +967,7 @@ String getValueFromDictionary(String key, String jsonString) {
   return extractedValue;
 }
 
-bool isUserExistInFBApprovedList(int id) {
+bool isUserExistInFBApprovedList(int id, char* currentTimeStr) {
   if (Firebase.ready()) {
     String documentPath = "ApprovedUsers/user" + String(id);
     String mask = "data";
@@ -981,7 +986,7 @@ bool isUserExistInFBApprovedList(int id) {
 
       String userID = getValueFromDictionary(String("stringValue"), obj["fields"]["data"]["mapValue"]["fields"]["id"].as<String>());// digits
 
-      addUserToApprovedUsersFile(id, userID, now()); // write to approved file
+      addUserToApprovedUsersFile(id, userID, currentTimeStr); // write to approved file
 
       return true;
     }
@@ -1010,6 +1015,17 @@ void loop() {
 
   delay(50);
 
+
+  struct tm timeinfo;
+  char currentTimeStr[20] = "";
+  if(!getLocalTime(&timeinfo)){
+     Serial.println("Failed to obtain time");
+    //return;
+  }
+  else {
+     strftime(currentTimeStr, sizeof(currentTimeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  }
+   
   //User current_user;
   //Didn't find a match
 
@@ -1032,17 +1048,17 @@ void loop() {
 
     fingerPrintID = getFingerprintEnroll();
     id_str = GetIdFromKeypad();
-    current_time = now();
+    
     printSPIFFSfiles();
 
 
     if (id > 0 && id <= 162) {
-      addUserToPendingUsersFile(id, id_str, true, false, current_time);
+      addUserToPendingUsersFile(id, id_str, true, false, currentTimeStr);
       Serial.println("Files IN SPIFFS");
       printSPIFFSfiles();
 
       if (Firebase.ready() && (WiFi.status() == WL_CONNECTED)) { // upload the data to the firebase to the pinding users
-        addPendingUserToFireBase(id, id_str, true, false, current_time);
+        addPendingUserToFireBase(id, id_str, true, false, currentTimeStr);
       }
       else {
         if (millis() - reconnectTime < reconnectionTimeout) {
@@ -1060,7 +1076,7 @@ void loop() {
   else if (FingerID > 0)  {
     // check if user have been approved
     if (Firebase.ready() && (WiFi.status() == WL_CONNECTED)) { // upload the data to the firebase to the pinding users
-      if (isUserExistInFBApprovedList(FingerID)) { // this function insert the user to the approved users file
+      if (isUserExistInFBApprovedList(FingerID, currentTimeStr)) { // this function insert the user to the approved users file
         setColor(0, 255, 0);
         display.clearDisplay();
         display.println("Welcome!\n");
