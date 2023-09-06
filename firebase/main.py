@@ -26,8 +26,8 @@ async def check_firestore(update: Update, context: CallbackContext):
     # Check if the collection exists and is not empty
     collection_ref = db.collection(collection_name)
     documents = collection_ref.stream()
-    if not documents:
-        update.message.reply_text("The collection is empty or does not exist.")
+    if len(list(documents)) == 0:
+        await update.message.reply_text("The collection is empty or does not exist.")
         return
     for doc in documents:
         # Get data from the current document
@@ -36,9 +36,31 @@ async def check_firestore(update: Update, context: CallbackContext):
         if document_data:
             fingerID = document_data.get('data', {}).get('FingerPrintID')
             userID = document_data.get('data', {}).get('id')
+            time = document_data.get('data', {}).get('time')
         if fingerID is not None and userID is not None :
-            print(f"finger print id is:{fingerID} and user id is {userID}")
-            await update.message.reply_text(f"finger print id is: {fingerID} and user id is: {userID}")
+            print(f"finger print id is:{fingerID} and user id is {userID} registered at: {time}")
+            await update.message.reply_text(f"finger print id is: {fingerID} and user id is: {userID} registered at: {time}")
+        else:
+            print("Field not found or is empty")
+
+async def showApprovedUsers(update: Update, context: CallbackContext):
+    db = firestore.client()
+    collection_name = 'ApprovedUsers'
+    collection_ref = db.collection(collection_name)
+    documents = collection_ref.stream()
+    if len(list(documents)) == 0:
+        update.message.reply_text("The collection is empty or does not exist.")
+        return
+    for doc in documents:
+        # Get data from the current document
+        document_data = doc.to_dict()
+        if document_data:
+            fingerID = document_data.get('data', {}).get('FingerPrintID')
+            userID = document_data.get('data', {}).get('id')
+            time = document_data.get('data', {}).get('time')
+        if fingerID is not None and userID is not None:
+            print(f"finger print id:{fingerID} \nid:{userID} \ntime: {time}")
+            await update.message.reply_text(f"finger print id:{fingerID} \nid:{userID} \ntime: {time}")
         else:
             print("Field not found or is empty")
 
@@ -57,6 +79,7 @@ def handle_approval(text):
     words = text.split()
     finger_print_id = None
     user_id = None
+    time = None
     # Iterate through the words to find the values
     for i in range(len(words) - 1):
         if words[i] == "is:":
@@ -64,6 +87,8 @@ def handle_approval(text):
                 finger_print_id = words[i + 1]
             elif words[i - 2] == "user":
                 user_id = words[i + 1]
+        elif words[i] == "at:":
+            time = words[i+1]
 
     if finger_print_id is not None:
         finger_print_id = int(finger_print_id)
@@ -71,28 +96,39 @@ def handle_approval(text):
     user_data = {
         'data': {
             'FingerPrintID': finger_print_id,
-            'id': user_id
+            'id': user_id,
+            'time': time
         }
     }
+    #add user to approval collection
     approved_users_collection = db.collection('ApprovedUsers')
     document_id = f'user{finger_print_id}'
     approved_users_collection.document(document_id).set(user_data)
 
+    #delete user from pending cillection
+    pendingList = db.collection('PendingUsers')
+    document = f'user{finger_print_id}'
+    document_ref = pendingList.document(document)
+    document_ref.delete()
+
 def handle_decline(text):
     words = text.split()
     finger_print_id = None
-    user_id = None
-    # Iterate through the words to find the values
+
     for i in range(len(words) - 1):
         if words[i] == "is:":
             if words[i - 2] == "print":
                 finger_print_id = words[i + 1]
-            elif words[i - 2] == "user":
-                user_id = words[i + 1]
 
     if finger_print_id is not None:
         finger_print_id = int(finger_print_id)
 
+    db = firestore.client()
+    pendingList = db.collection('PendingUsers')
+    document = f'user{finger_print_id}'
+    document_ref = pendingList.document(document)
+    document_ref.delete()
+    print(f"user{finger_print_id} has been deleted from PendingUsers collection")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_type: str = update.message.chat.type
@@ -108,23 +144,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     else:
         # Check if the message contains an emoji
-        if "✔" or "✅" or "☑" in update.message.text:
+        if "✔" in update.message.text or "✅" in update.message.text or "☑" in update.message.text:
             # Handle the ✔ emoji reaction
             if update.message.reply_to_message:
                 replied_message = update.message.reply_to_message
                 original_message_text = replied_message.text
                 if(is_valid_message(original_message_text)):
                     handle_approval(original_message_text)
-                response = "You reacted with ✔"
+                    response = "You reacted with ✔ - success"
             else: response = "please reply to a specific message"
-        elif "❌" or "❎" in update.message.text:
+        elif "❌" in update.message.text or "❎" in update.message.text:
             # Handle the ❌ emoji reaction
             if update.message.reply_to_message:
                 replied_message = update.message.reply_to_message
                 original_message_text = replied_message.text
-                if (is_valid_message(original_message_text)):
-                    handle_approval(original_message_text)
-                response = "You reacted with ❌"
+                if is_valid_message(original_message_text):
+                    handle_decline(original_message_text)
+                    response = "You reacted with ❌"
             else: response = "please reply to a specific message"
         else: response: str = handle_response(text)
 
@@ -142,6 +178,7 @@ if __name__ == '__main__':
     #commands
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('check_firestore', check_firestore))
+    app.add_handler(CommandHandler('showApprovedUsers', showApprovedUsers))
 
     #messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
