@@ -1,5 +1,6 @@
 from typing import final
 import re
+import logging
 from telegram import Update
 from firebase_admin import credentials, initialize_app, firestore
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters, ContextTypes
@@ -18,7 +19,71 @@ def is_valid_message(message):
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('hello!, i am the BOSS!')
 
+async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    bot_info_message = """
+*BAS_FB_bot Info*
+
+This bot allows you to interact with a Firestore database and perform various tasks\.
+
+*Available Commands:*
+\- /start: Start the bot and get a welcome message\.
+\- /check\_firestore: Check pending users in the Firestore database\.
+\- /approved\_users: Show approved users in the Firestore database\.
+\- /delete: Delete a user from the pending users list \(replace `ID` with the user's ID\)\.
+\- /accept: Accept a user and move them to the approved users list \(replace `ID` with the user's ID\)\.
+
+*Usage:*
+To delete a user: `/delete \<ID\>`
+To accept a user: `/accept \<ID\>`
+
+Enjoy using the bot 🙂 \!
+    """
+    await update.message.reply_text(bot_info_message, parse_mode='MarkdownV2')
+
 async def check_firestore(update: Update, context: CallbackContext):
+    try:
+        # Read data from Firebase
+        db = firestore.client()
+        collection_name = 'PendingUsers'
+
+        # Check if the collection exists and is not empty
+        collection_ref = db.collection(collection_name)
+        documents = collection_ref.stream()
+
+        # Log the total number of documents in the collection
+        logging.info(f"Total documents in '{collection_name}': {len(list(documents))}")
+
+        # Reset the documents generator to iterate over them again
+        documents = collection_ref.stream()
+        usersList_message = "pending users:\n"
+        for doc in documents:
+            # Log document ID before processing
+            logging.info(f"Processing document: {doc.id}")
+
+            # Get data from the current document
+            document_data = doc.to_dict()
+
+            if document_data:
+                fingerID = document_data.get('data', {}).get('FingerPrintID')
+                userID = document_data.get('data', {}).get('id')
+
+                if fingerID is not None and userID is not None:
+                    #logging.info(f"finger print id is: {fingerID} and user id is: {userID} registered at: {time}")
+                    usersList_message += f"user{fingerID} ID: {userID}\n"
+                else:
+                    logging.warning(f"Field not found or is empty in document: {doc.id}")
+            else:
+                logging.warning(f"Document data is empty for document: {doc.id}")
+        await update.message.reply_text(usersList_message)
+        # Log a message after processing all documents
+        logging.info("Finished processing documents")
+
+    except Exception as e:
+        # Handle exceptions here, log the error, and potentially send an error message to the user
+        logging.error(f"Error processing Firestore documents: {str(e)}")
+        await update.message.reply_text("An error occurred while processing Firestore documents.")
+
+    ''''
     # Read data from Firebase
     db = firestore.client()
     collection_name = 'PendingUsers'
@@ -42,27 +107,87 @@ async def check_firestore(update: Update, context: CallbackContext):
             await update.message.reply_text(f"finger print id is: {fingerID} and user id is: {userID} registered at: {time}")
         else:
             print("Field not found or is empty")
-
+'''
 async def showApprovedUsers(update: Update, context: CallbackContext):
-    db = firestore.client()
-    collection_name = 'ApprovedUsers'
-    collection_ref = db.collection(collection_name)
-    documents = collection_ref.stream()
-    if len(list(documents)) == 0:
-        update.message.reply_text("The collection is empty or does not exist.")
-        return
-    for doc in documents:
-        # Get data from the current document
-        document_data = doc.to_dict()
-        if document_data:
-            fingerID = document_data.get('data', {}).get('FingerPrintID')
-            userID = document_data.get('data', {}).get('id')
-            time = document_data.get('data', {}).get('time')
-        if fingerID is not None and userID is not None:
-            print(f"finger print id:{fingerID} \nid:{userID} \ntime: {time}")
-            await update.message.reply_text(f"finger print id:{fingerID} \nid:{userID} \ntime: {time}")
-        else:
-            print("Field not found or is empty")
+    try:
+        # Read data from Firebase
+        db = firestore.client()
+        collection_name = 'ApprovedUsers'
+
+        # Check if the collection exists and is not empty
+        collection_ref = db.collection(collection_name)
+        documents = collection_ref.stream()
+
+        # Log the total number of documents in the collection
+        logging.info(f"Total documents in '{collection_name}': {len(list(documents))}")
+
+        # Reset the documents generator to iterate over them again
+        documents = collection_ref.stream()
+        usersList_message = "approved users:\n"
+        for doc in documents:
+            # Log document ID before processing
+            logging.info(f"Processing document: {doc.id}")
+
+            # Get data from the current document
+            document_data = doc.to_dict()
+
+            if document_data:
+                fingerID = document_data.get('data', {}).get('FingerPrintID')
+                userID = document_data.get('data', {}).get('id')
+                time = document_data.get('data', {}).get('time')
+
+                if fingerID is not None and userID is not None:
+                    usersList_message += f"user{fingerID} ID: {userID}, logged in at {time}\n"
+                else:
+                    logging.warning(f"Field not found or is empty in document: {doc.id}")
+            else:
+                logging.warning(f"Document data is empty for document: {doc.id}")
+        await update.message.reply_text(usersList_message)
+        # Log a message after processing all documents
+        logging.info("Finished processing documents")
+
+    except Exception as e:
+        # Handle exceptions here, log the error, and potentially send an error message to the user
+        logging.error(f"Error processing Firestore documents: {str(e)}")
+        await update.message.reply_text("An error occurred while processing Firestore documents.")
+
+async def accept(update: Update, context: CallbackContext):
+    #delete the user from pending list
+    id_number = int(context.args[0])
+    db1 = firestore.client()
+    pendingList = db1.collection('PendingUsers')
+    document = f'user{id_number}'
+    document_ref = pendingList.document(document)
+    doc = pendingList.document(document).get()
+    document_ref.delete()
+
+    #add user to approved users list
+    db2 = firestore.client()
+    approvedUsers = db2.collection('ApprovedUsers')
+    if doc.exists:
+        doc_toAdd = doc.to_dict()
+        doc_toAdd_name = f"user{id_number}"
+        approvedUsers.document(doc_toAdd_name).set(doc_toAdd)
+        print(f"user{id_number} has been add to approved collection")
+        result_message = f"added user with finger ID {id_number}"
+        await update.message.reply_text(result_message)
+
+async def delete(update: Update, context: CallbackContext):
+    if len(context.args) == 1:
+        try:
+            id_number = int(context.args[0])
+            db = firestore.client()
+            pendingList = db.collection('PendingUsers')
+            document = f'user{id_number}'
+            document_ref = pendingList.document(document)
+            document_ref.delete()
+            print(f"user{id_number} has been deleted from PendingUsers collection")
+            result_message = f"Deleted user with finger ID {id_number}"
+        except ValueError:
+            result_message = "Invalid ID number. Please provide a valid integer."
+    else:
+        result_message = "Usage: /delete <ID>"
+    await update.message.reply_text(result_message)
 
 #Responses
 def handle_response(text: str) -> str:
@@ -70,7 +195,7 @@ def handle_response(text: str) -> str:
     if 'hello' in processed:
         return 'hey there'
     elif 'how are you' in processed:
-        return 'i am good'
+        return 'I am good'
     else: return 'BAKAAAAA'
 
 def handle_approval(text):
@@ -177,8 +302,11 @@ if __name__ == '__main__':
 
     #commands
     app.add_handler(CommandHandler('start', start_command))
+    app.add_handler(CommandHandler('info', info_command))
     app.add_handler(CommandHandler('check_firestore', check_firestore))
-    app.add_handler(CommandHandler('showApprovedUsers', showApprovedUsers))
+    app.add_handler(CommandHandler('approved_users', showApprovedUsers))
+    app.add_handler(CommandHandler("delete", delete))
+    app.add_handler(CommandHandler("accept", accept))
 
     #messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
