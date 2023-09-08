@@ -5,10 +5,8 @@
 # Folder description:
 * ESP32: source code for the esp side (firmware).
 * Documentation: wiring diagram + basic operating instructions
-* Unit Tests: tests for individual hardware components (input / output devices)
-* flutter_app : dart code for our Flutter app.
+* Unit Tests: tests for individual hardware components (input / output devices).
 * Parameters: contains description of configurable parameters
-* Assets: 3D printed parts, Audio files used in this project.
 
 # Arduino/ESP32 libraries used in this project:
 
