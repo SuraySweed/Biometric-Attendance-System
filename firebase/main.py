@@ -21,7 +21,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_info_message = """
-*BAS_FB_bot Info*
+*BAS\_FB\_bot Info*
 
 This bot allows you to interact with a Firestore database and perform various tasks\.
 
@@ -49,10 +49,12 @@ async def check_firestore(update: Update, context: CallbackContext):
         # Check if the collection exists and is not empty
         collection_ref = db.collection(collection_name)
         documents = collection_ref.stream()
+        if len(list(documents)) == 0:
+            await update.message.reply_text("The collection is empty or does not exist.")
+            return
 
         # Log the total number of documents in the collection
         logging.info(f"Total documents in '{collection_name}': {len(list(documents))}")
-
         # Reset the documents generator to iterate over them again
         documents = collection_ref.stream()
         usersList_message = "pending users:\n"
@@ -62,16 +64,16 @@ async def check_firestore(update: Update, context: CallbackContext):
 
             # Get data from the current document
             document_data = doc.to_dict()
-
             if document_data:
-                fingerID = document_data.get('data', {}).get('FingerPrintID')
-                userID = document_data.get('data', {}).get('id')
+                if(document_data.get('data', {}).get('isPending')):
+                    fingerID = document_data.get('data', {}).get('FingerPrintID')
+                    userID = document_data.get('data', {}).get('id')
 
-                if fingerID is not None and userID is not None:
-                    #logging.info(f"finger print id is: {fingerID} and user id is: {userID} registered at: {time}")
-                    usersList_message += f"user{fingerID} ID: {userID}\n"
-                else:
-                    logging.warning(f"Field not found or is empty in document: {doc.id}")
+                    if fingerID is not None and userID is not None:
+                        #logging.info(f"finger print id is: {fingerID} and user id is: {userID} registered at: {time}")
+                        usersList_message += f"user{fingerID} ID: {userID}\n"
+                    else:
+                        logging.warning(f"Field not found or is empty in document: {doc.id}")
             else:
                 logging.warning(f"Document data is empty for document: {doc.id}")
         await update.message.reply_text(usersList_message)
@@ -117,7 +119,9 @@ async def showApprovedUsers(update: Update, context: CallbackContext):
         # Check if the collection exists and is not empty
         collection_ref = db.collection(collection_name)
         documents = collection_ref.stream()
-
+        if len(list(documents)) == 0:
+            await update.message.reply_text("The collection is empty or does not exist.")
+            return
         # Log the total number of documents in the collection
         logging.info(f"Total documents in '{collection_name}': {len(list(documents))}")
 
@@ -152,37 +156,91 @@ async def showApprovedUsers(update: Update, context: CallbackContext):
         await update.message.reply_text("An error occurred while processing Firestore documents.")
 
 async def accept(update: Update, context: CallbackContext):
-    #delete the user from pending list
-    id_number = int(context.args[0])
-    db1 = firestore.client()
-    pendingList = db1.collection('PendingUsers')
-    document = f'user{id_number}'
-    document_ref = pendingList.document(document)
-    doc = pendingList.document(document).get()
-    document_ref.delete()
+    if len(context.args) == 1:
+        try:
+            db1 = firestore.client()
+            pendingList = db1.collection('PendingUsers')
+            db2 = firestore.client()
+            approvedUsers = db2.collection('ApprovedUsers')
+            if(context.args[0] == 'all'):
+                documents = pendingList.stream()
+                for doc in documents:
+                    doc_toAdd = doc.to_dict()
+                    id_number = doc_toAdd.get('data', {}).get('FingerPrintID')
+                    doc_toAdd['data']['isPending'] = False  # update the field isPending in pendingUsers
+                    document_ref = pendingList.document(f'user{id_number}')
+                    document_ref.set(doc_toAdd)
+                    doc_toAdd_name = f"user{id_number}"
+                    approvedUsers.document(doc_toAdd_name).set(doc_toAdd)
+                print("all user have been add to ApprovedUsers collection\n")
+                result_message = "all users have been accepted"
+                await update.message.reply_text(result_message)
+            else:
+                #get the user document from pending list
+                id_number = int(context.args[0])
+                document = f'user{id_number}'
+                document_ref = pendingList.document(document)
+                doc = pendingList.document(document).get()
+                #document_ref.delete()
+                #add user to approved users list
 
-    #add user to approved users list
-    db2 = firestore.client()
-    approvedUsers = db2.collection('ApprovedUsers')
-    if doc.exists:
-        doc_toAdd = doc.to_dict()
-        doc_toAdd_name = f"user{id_number}"
-        approvedUsers.document(doc_toAdd_name).set(doc_toAdd)
-        print(f"user{id_number} has been add to approved collection")
-        result_message = f"added user with finger ID {id_number}"
-        await update.message.reply_text(result_message)
+                if doc.exists:
+                    doc_toAdd = doc.to_dict()
+                    doc_toAdd_name = f"user{id_number}"
+                    doc_toAdd['data']['isPending'] = False #update the field isPending in pendingUsers
+                    document_ref.set(doc_toAdd)
+                    approvedUsers.document(doc_toAdd_name).set(doc_toAdd)
+                    print(f"user{id_number} has been add to approved collection")
+                    result_message = f"added user with finger ID {id_number}"
+                    await update.message.reply_text(result_message)
+        except ValueError:
+            result_message = "Invalid ID number. Please provide a valid integer."
+    else:
+        result_message = "Usage: /delete <ID>"
+    await update.message.reply_text(result_message)
+
 
 async def delete(update: Update, context: CallbackContext):
     if len(context.args) == 1:
         try:
-            id_number = int(context.args[0])
-            db = firestore.client()
-            pendingList = db.collection('PendingUsers')
-            document = f'user{id_number}'
-            document_ref = pendingList.document(document)
-            document_ref.delete()
-            print(f"user{id_number} has been deleted from PendingUsers collection")
-            result_message = f"Deleted user with finger ID {id_number}"
+            db1 = firestore.client()
+            pendingList = db1.collection('PendingUsers')
+            db2 = firestore.client()
+            RejectedUsers = db2.collection('RejectedUsers')
+            #reject all users
+            if(context.args[0] == 'all'):
+                documents = pendingList.stream()
+                for doc in documents:
+                    doc_toAdd = doc.to_dict()
+                    id_number = doc_toAdd.get('data', {}).get('FingerPrintID')
+                    doc_toAdd['data']['isPending'] = False  # update the field isPending in pendingUsers
+                    document_ref = pendingList.document(f'user{id_number}')
+                    document_ref.set(doc_toAdd)
+                    doc_toAdd_name = f"user{id_number}"
+                    RejectedUsers.document(doc_toAdd_name).set(doc_toAdd)
+                print("all user have been add to rejected collection\n")
+                result_message = "all users have been rejected"
+                await update.message.reply_text(result_message)
+            else:
+                #get user document from PendingUsers collection
+                id_number = int(context.args[0])
+                document = f'user{id_number}'
+                document_ref = pendingList.document(document)
+                doc = pendingList.document(document).get()
+                #document_ref.delete()
+                print(f"user{id_number} has been rejected")
+                #result_message = f"rejectd user with finger ID {id_number}"
+
+                #add user document to RejectedUsers collection
+                if doc.exists:
+                    doc_toAdd = doc.to_dict()
+                    doc_toAdd_name = f"user{id_number}"
+                    doc_toAdd['data']['isPending'] = False  # update the field isPending in pendingUsers
+                    document_ref.set(doc_toAdd)
+                    RejectedUsers.document(doc_toAdd_name).set(doc_toAdd)
+                    print(f"user{id_number} has been add to rejected collection")
+                    result_message = f"rejected user with finger ID {id_number}"
+                    await update.message.reply_text(result_message)
         except ValueError:
             result_message = "Invalid ID number. Please provide a valid integer."
     else:
