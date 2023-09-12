@@ -16,8 +16,21 @@ void setup() {
      while (file.available()) {
       DeserializationError error = deserializeJson(doc, file);
       serializeJson(doc, jsonString);
+      if (jsonString.startsWith("[") && jsonString.endsWith("]")) {
+        jsonString = jsonString.substring(1, jsonString.length() - 1);
+      }
       Serial.println(jsonString);
-          file.read();
+
+      error = deserializeJson(doc, jsonString);
+      if (error) {
+          Serial.println("sendWaitingUsersToFirestore-------- Failed to read JSON");
+          return;
+       }
+       JsonObject userObj = doc.as<JsonObject>();
+        Serial.println("userobj id");
+        Serial.println(userObj["FingerPrintID"].as<String>());
+      
+      file.read();
       jsonString ="";
     }
     file.close();

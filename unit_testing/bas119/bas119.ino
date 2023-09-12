@@ -18,6 +18,8 @@
 #include <map>
 #include <Firebase_ESP_Client.h>
 #include <addons/TokenHelper.h>
+#include <Preferences.h>
+
 //#include <Arduino.h>
 
 
@@ -49,15 +51,16 @@ char hexaKeys[ROWS][COLS] = {
 };
 
 
-byte rowPins[ROWS] = { 19, 21, 22, 23 }; //connect to the row pinouts of the keypad
+byte rowPins[ROWS] = { 19,27, 26, 25 }; //connect to the row pinouts of the keypad
 byte colPins[COLS] = { 2, 4, 5, 18 }; //connect to the column pinouts of the keypad
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
 
+Preferences preferences;
+
 int FingerID; // The Fingerprint ID from the scanner
 String inputString = "";
-uint8_t id = 1;
 const int MAX_USERS = 162;
 time_t current_time;
 uint8_t fingerPrintID;
@@ -65,17 +68,21 @@ String id_str;
 const char* approved_users_path = "/approved_users.json";
 const char* pending_users_path = "/pending_users.json";
 const char* rejected_users_path = "/rejected_users.json";
+const char* users_logs_path = "/users_logs.json";
 FirebaseJson content;
 unsigned long dataMillis = 0;
 unsigned long WifiStartTime = 0; //for wifi
-unsigned long connectionTimeout = 25000; // 25 seconds
+unsigned long connectionTimeout = 10000; // 10 seconds
 unsigned long reconnectTime = 0;
+unsigned long printFileContentTime = 0;
+unsigned long printFileContentTimeOut = 180000; // 3 min to reconnect // need to change
 unsigned long reconnectionTimeout = 120000; // 2 min to reconnect // need to change
 unsigned long UpdateTime = 0;
-unsigned long UpdateTimeout = 10000;   //update firebase every 2 mins //need to change
-unsigned long ID_Timeout = 10000;
-unsigned int current_id = 1;
-unsigned int current_sent_FB = 1;
+unsigned long UpdateTimeout = 120000;   //update firebase every 2 mins //need to change
+unsigned long ID_Timeout = 12000;
+uint8_t id = 1;
+unsigned int current_sent_id_to_FB = 0;
+String updated_users_from_FB_to_files = ""; // 2 options: rejected file or approved file
 bool isConnected = false;
 /* 2. Define the API Key */
 /* 3. Define the project ID */
@@ -89,11 +96,43 @@ bool isConnected = false;
 void fingerPrintSensorClear();
 void initiatefile();
 void printSPIFFSfiles();
+void initiatePerefernces();
 
 // Define Firebase Data object
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
+
+String buildZeroString() {
+    String result = "";
+    for (int i = 0; i < MAX_USERS; i++) {
+        result += '0';
+    }
+    return result;
+}
+
+String modifyCharacter(String input, int index, char newChar) {
+    // Check if the index is within the bounds of the string
+    if (index >= 0 && index < input.length()) {
+        // Create a new string with the modified character
+        input[index] = newChar;
+    }
+    return input;
+}
+
+String updateUpdatingUserFromFBToArray(int user_id) {
+    String modifiedString = modifyCharacter(updated_users_from_FB_to_files, user_id - 1, '1');
+    return modifiedString;
+}
+
+bool isUserUpdatingToFileFromFB(int user_id) {
+    char charAtIndex = updated_users_from_FB_to_files.charAt(user_id - 1);
+    if (charAtIndex == '1') {
+        return true;
+    }
+    return false;
+}
+
 
 void connectToFireBase() {
     Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
@@ -157,6 +196,8 @@ void setup() {
     pinMode(greenPin, OUTPUT);
     pinMode(bluePin, OUTPUT);
 
+    updated_users_from_FB_to_files = buildZeroString();
+
     //-----------initiate OLED display-------------
     // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x64
@@ -206,8 +247,72 @@ void setup() {
     finger.getTemplateCount();
     Serial.print("Sensor contains "); Serial.print(finger.templateCount); Serial.println(" templates");
 
-    connectToWifi();
 
+    connectToWifi();
+}
+
+void printFileContent(const char* file_path) {
+    File file = SPIFFS.open(file_path, "r");
+    if (!file) {
+        Serial.print("printFileContent----------- Failed to open file for reading");
+        Serial.print(file_path);
+        Serial.println();
+        return;
+    }
+    Serial.println("\n");
+    Serial.print(file_path);
+    Serial.println(" File Content:");
+
+    while (file.available()) {
+        Serial.write(file.read());
+    }
+
+    Serial.println();
+
+    file.close();
+}
+
+void initiatePerefernces() {
+    preferences.begin("myApp", false);
+
+    if (preferences.isKey("id")) {
+        // The "id" key exists in preferences
+        preferences.putInt("id", 1);
+        id = preferences.getInt("id", 0);
+        Serial.print("ID exists. Value: ");
+        Serial.println(id);
+    }
+    else {
+        // The "id" key does not exist in preferences, so initialize it with a default value
+        int defaultId = 1; // Set your desired default value here
+        preferences.putInt("id", defaultId);
+        Serial.print("ID did not exist. Initialized with default value: ");
+        Serial.println(defaultId);
+    }
+
+    if (preferences.isKey("cuurent_pending_user_sent")) {
+        // The "id" key exists in preferences
+        //preferences.putInt("cuurent_pending_user_sent", 1);
+        current_sent_id_to_FB = preferences.getInt("cuurent_pending_user_sent", 0);
+        Serial.print("cuurent_pending_user_sent exists. Value: ");
+        Serial.println(current_sent_id_to_FB);
+    }
+    else {
+        // The "id" key does not exist in preferences, so initialize it with a default value
+        int defaultValue = 0; // Set your desired default value here
+        preferences.putInt("id", defaultValue);
+        Serial.print("cuurent_pending_user_sent did not exist. Initialized with default value: ");
+        Serial.println(defaultValue);
+    }
+
+    if (preferences.isKey("updated_users_from_FB_to_files")) {
+        updated_users_from_FB_to_files = preferences.getString("updated_users_from_FB_to_files", "");
+    }
+    else {
+        preferences.putString("updated_users_from_FB_to_files", updated_users_from_FB_to_files);
+    }
+
+    preferences.end();
 }
 
 void fingerPrintSensorClear() {
@@ -573,7 +678,7 @@ void setColor(int redValue, int greenValue, int blueValue) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////
-void addUserToPendingUsersFile(int fingerprint_id, String id, bool is_pending, bool is_approved, char* currentTimeStr) {
+void addUserToPendingUsersFile(int fingerprint_id, String id, char* currentTimeStr) {
     File file = SPIFFS.open(pending_users_path, "a");
     if (!file) {
         Serial.println("Failed to open file for writing");
@@ -586,8 +691,6 @@ void addUserToPendingUsersFile(int fingerprint_id, String id, bool is_pending, b
     JsonObject userObj = doc.createNestedObject();
     userObj["FingerPrintID"] = fingerprint_id;
     userObj["id"] = id;
-    userObj["isApproved"] = is_approved;
-    userObj["isPending"] = is_pending;
     userObj["time"] = String(currentTimeStr);
 
     if (serializeJson(doc, file)) {
@@ -615,12 +718,14 @@ void addUserToPendingUsersFile(int fingerprint_id, String id, bool is_pending, b
     file.close();
 }
 
-void addUserToFile(int fingerprint_id, String id, char* currentTimeStr, const char* file_name) {
+void addUserToFile(int fingerprint_id, String id, const char* currentTimeStr, const char* file_name) {
     DynamicJsonDocument doc(10000);
     File file;
     file = SPIFFS.open(file_name, "r");
     if (!file) {
-        Serial.println("addUserToFile-------- Failed to open file for reading");
+        Serial.print("addUserToFile-------- Failed to open file for reading in ");
+        Serial.print(file_name);
+        Serial.println();
         return;
     }
 
@@ -628,21 +733,29 @@ void addUserToFile(int fingerprint_id, String id, char* currentTimeStr, const ch
     file.close();
 
     for (JsonObject userObj : doc.as<JsonArray>()) {
-        Serial.println("addUserToFile------- here");
+        Serial.print("addUserToFile-------");
+        Serial.print(file_name);
+        Serial.println();
         int fingerprint = userObj["FingerPrintID"].as<uint8_t>();
         if (fingerprint == fingerprint_id) {
-            Serial.println("addUserToFile------- user found in file");
+            Serial.print("addUserToFile------- user found in file in ");
+            Serial.print(file_name);
+            Serial.println();
             return;
         }
     }
 
     file = SPIFFS.open(file_name, "a");
     if (!file) {
-        Serial.println("addUserToFile-------Failed to open file for writing");
+        Serial.print("addUserToFile-------Failed to open file for writing in ");
+        Serial.println(file_name);
+        Serial.println();
         return;
     }
 
-    Serial.println("addUserToFile---------- File opened successfully");
+    Serial.print("addUserToFile---------- File opened successfully in ");
+    Serial.print(file_name);
+    Serial.println();
 
     DynamicJsonDocument writedoc(10000);
 
@@ -652,10 +765,19 @@ void addUserToFile(int fingerprint_id, String id, char* currentTimeStr, const ch
     userObj2["time"] = String(currentTimeStr);
 
     if (serializeJson(writedoc, file)) {
-        Serial.println("addUserToFile----------- Data written to file successfully");
+        Serial.print("addUserToFile----------- Data written to file successfully in ");
+        Serial.print(file_name);
+        Serial.println();
+        updated_users_from_FB_to_files = updateUpdatingUserFromFBToArray(fingerprint_id);
+
+        preferences.begin("myApp", false);
+        preferences.putString("updated_users_from_FB_to_files", updated_users_from_FB_to_files);
+        preferences.end();
     }
     else {
-        Serial.println("addUserToFile------------ Failed to write data to file");
+        Serial.print("addUserToFile------------ Failed to write data to file in ");
+        Serial.print(file_name);
+        Serial.println();
     }
 
     file.close();
@@ -693,55 +815,68 @@ bool isUserInFile(int targetFingerprint, const char* file_name) {
 void sendPendingUsersToFB() {
     File file = SPIFFS.open(pending_users_path, "r");
     if (!file) {
-        Serial.println("sendWaitingUsersToFirestore--------- Failed to read JSON from file");
+        Serial.println("sendPendingUsersToFB--------- Failed to read JSON from file");
         return;
     }
 
-      Serial.println("\n");
-      Serial.println("addUserToPendingUsersFile------------- File Content:");
-      while (file.available()) {
-           Serial.write(file.read());
-       }
+    Serial.println("\n");
+    Serial.println("sendPendingUsersToFB------------- File Content:");
+    while (file.available()) {
+        Serial.write(file.read());
+    }
 
-  Serial.println("\n");
+    Serial.println("\n");
 
-  file.close();
+    file.close();
     DynamicJsonDocument doc(1024);
     file = SPIFFS.open(pending_users_path, "r");
+
     if (Firebase.ready()) {
-        while(file.available()) {
+        if (file.available()) {
+            for (int i = 1; i <= current_sent_id_to_FB; i++) {
+                file.read();
+            }
+        }
+        while (file.available()) {
             DeserializationError error = deserializeJson(doc, file);
             if (error) {
-               Serial.println("sendWaitingUsersToFirestore-------- Failed to read JSON");
-               return;
+                Serial.println("sendPendingUsersToFB-------- Failed to read JSON");
+                return;
             }
             String jsonString;
             serializeJson(doc, jsonString);
             if (jsonString.startsWith("[") && jsonString.endsWith("]")) {
-               jsonString = jsonString.substring(1, jsonString.length() - 1);
+                jsonString = jsonString.substring(1, jsonString.length() - 1);
             }
             error = deserializeJson(doc, jsonString);
             if (error) {
-               Serial.println("sendWaitingUsersToFirestore-------- Failed to read JSON");
-               return;
+                Serial.println("sendPendingUsersToFB-------- Failed to read JSON");
+                return;
             }
             JsonObject userObj = doc.as<JsonObject>();
-           
+
             String documentPath = "PendingUsers/user" + userObj["FingerPrintID"].as<String>(); // id- fingerPrintID
 
             content.set("fields/data/mapValue/fields/FingerPrintID/integerValue", userObj["FingerPrintID"].as<int>());
             content.set("fields/data/mapValue/fields/id/stringValue", userObj["id"].as<String>());
-            content.set("fields/data/mapValue/fields/isPending/booleanValue", userObj["isPending"].as<bool>());
-            content.set("fields/data/mapValue/fields/isApproved/booleanValue", userObj["isApproved"].as<bool>());
+            content.set("fields/data/mapValue/fields/isPending/booleanValue", true);
+            //content.set("fields/data/mapValue/fields/isApproved/booleanValue", false);
+            content.set("fields/data/mapValue/fields/time/stringValue", userObj["time"].as<String>());
             //  content.set("fields/data/mapValue/fields/time/stringValue", currentTimeStr);
             // timestamp
-            content.set("fields/Time/timestampValue", "2014-10-02T15:01:23Z");
+            //content.set("fields/Time/timestampValue", "2014-10-02T15:01:23Z");
 
             Serial.println("adding_user");
             Serial.println("Create a document... ");
 
             if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), content.raw())) {
                 Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+                current_sent_id_to_FB++;
+                preferences.begin("myApp", false);
+                preferences.putInt("cuurent_pending_user_sent", current_sent_id_to_FB);
+                preferences.end();
+                Serial.println("current_sent_id_to_FB value:");
+                Serial.println(current_sent_id_to_FB);
             }
             else {
                 Serial.println(fbdo.errorReason());
@@ -752,13 +887,62 @@ void sendPendingUsersToFB() {
     file.close();
 }
 
-// right logic
+void UpdateUsersFileFromFB(bool isApprovedFile) {
+    if (Firebase.ready()) {
+        for (int i = 1; i <= current_sent_id_to_FB; i++) {
+            if (!isUserUpdatingToFileFromFB(i)) {
+                // we have to check if the user is in the approved collection in firebase
+                String documentPath;
+                String mask = "data";
+                DynamicJsonDocument jsonArray(1024);
+                JsonArray documents = jsonArray.to<JsonArray>();
+                if (isApprovedFile) {
+                    documentPath = "ApprovedUsers/user" + String(i);
+                }
+                else {
+                    documentPath = "RejectedUsers/user" + String(i);
+                }
+                if (Firebase.Firestore.getDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), mask.c_str())) {
+                    Serial.println(fbdo.payload());
+
+                    DynamicJsonDocument doc(1024);
+                    deserializeJson(doc, fbdo.payload());
+                    documents.add(doc);
+                    JsonObject obj = doc.as<JsonObject>();
+
+                    String id = obj["fields"]["data"]["mapValue"]["fields"]["id"].as<String>();
+                    //int fingerprint_id = obj["fields"]["data"]["mapValue"]["fields"]["FingerPrintID"].as<int>();
+                    String time_str = obj["fields"]["data"]["mapValue"]["fields"]["time"].as<String>();
+
+                    Serial.print("ID: ");
+                    Serial.println(id);
+                    Serial.print("Fingerprint ID: ");
+                    Serial.println(i);
+                    Serial.print("Time: ");
+                    Serial.println(time_str);
+                    Serial.println();
+
+                    if (isApprovedFile) {
+                        addUserToFile(i, id, time_str.c_str(), approved_users_path);
+                    }
+                    else {
+                        addUserToFile(i, id, time_str.c_str(), rejected_users_path);
+                    }
+                }
+                else {
+                    Serial.println(fbdo.errorReason());
+                }
+            }
+        }
+    }
+}
+
+
 
 void UpdateFireBase() {
     sendPendingUsersToFB();
-    // GetApprovedUsersFromFB();
-  //   GetRejectedUsersFromFB();
-
+    UpdateUsersFileFromFB(true);   // approved file
+    UpdateUsersFileFromFB(false);  // rejected file
 }
 
 void printSPIFFSfiles() {
@@ -775,15 +959,15 @@ void printSPIFFSfiles() {
 
 
 
-void addPendingUserToFireBase(int fingerprint_id, String id, bool is_pending, bool is_approved, char* currentTimeStr) {
+void addPendingUserToFireBase(int fingerprint_id, String id, char* currentTimeStr) {
     if (Firebase.ready()) {
 
         String documentPath = "PendingUsers/user" + String(fingerprint_id); // id- fingerPrintID
 
         content.set("fields/data/mapValue/fields/FingerPrintID/integerValue", fingerprint_id);
         content.set("fields/data/mapValue/fields/id/stringValue", id.c_str());
-        content.set("fields/data/mapValue/fields/isPending/booleanValue", is_pending);
-        content.set("fields/data/mapValue/fields/isApproved/booleanValue", is_approved);
+        content.set("fields/data/mapValue/fields/isPending/booleanValue", true);
+        //content.set("fields/data/mapValue/fields/isApproved/booleanValue", is_approved);
         content.set("fields/data/mapValue/fields/time/stringValue", currentTimeStr);
         Serial.println("Create a document... ");
 
@@ -856,6 +1040,39 @@ bool isUserExistInFBList(int id, char* currentTimeStr, bool list) {
     return false;
 }
 
+void addLogToFile(int fingerprint_id, bool is_approved, bool is_pending, char* time_str) {
+    File file = SPIFFS.open(users_logs_path, "a");
+    if (!file) {
+        Serial.println("addLogToFile---------- Failed to open file for writing");
+        return;
+    }
+
+    Serial.println("addLogToFile---------- File opened successfully");
+
+    DynamicJsonDocument doc(1024);
+    JsonObject userObj = doc.createNestedObject();
+
+    userObj["FingerPrintID"] = fingerprint_id;
+    if (is_approved) {
+        userObj["status"] = "approved";
+    }
+    else if (!is_approved && !is_pending) {
+        userObj["status"] = "rejected";
+    }
+    else {
+        userObj["status"] = "pending";
+    }
+    userObj["time"] = String(time_str);
+
+    if (serializeJson(doc, file)) {
+        Serial.println("addLogToFile----------- Data written to file successfully");
+    }
+    else {
+        Serial.println("addLogToFile------------ Failed to write data to file");
+    }
+
+    file.close();
+}
 
 void loop() {
     Serial.println("Waiting for valid finger...");
@@ -877,11 +1094,10 @@ void loop() {
 
     struct tm timeinfo;
     char currentTimeStr[20] = "";
+    bool is_pending = false;
+    bool is_approved = false;
 
-
-    //User current_user;
     //Didn't find a match
-
     if (FingerID == -1) {
 
         setColor(255, 255, 0);
@@ -896,8 +1112,9 @@ void loop() {
 
         delay(4000);
 
-
+        Serial.println("Enter your ID in keypad");
         id_str = GetIdFromKeypad();
+
         if (id_str == "") {
             setColor(255, 50, 0);
             display.clearDisplay();
@@ -929,7 +1146,6 @@ void loop() {
             }
 
             else {
-
                 printSPIFFSfiles();
                 if (id > 0 && id <= 162) {
                     if (!getLocalTime(&timeinfo)) {
@@ -939,7 +1155,7 @@ void loop() {
                     else {
                         strftime(currentTimeStr, sizeof(currentTimeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
                     }
-                    addUserToFile(id, id_str, currentTimeStr,pending_users_path);
+                    addUserToPendingUsersFile(id, id_str, currentTimeStr);
                     Serial.println("Files IN SPIFFS");
                     printSPIFFSfiles();
                     display.clearDisplay();
@@ -953,7 +1169,18 @@ void loop() {
                     display.display();
                     delay(3000);
                     if (Firebase.ready() && (WiFi.status() == WL_CONNECTED)) { // upload the data to the firebase to the pinding users
-                        addPendingUserToFireBase(id, id_str, true, false, currentTimeStr);
+                        if ((current_sent_id_to_FB + 1) == id) {
+                            addPendingUserToFireBase(id, id_str, currentTimeStr);
+                            current_sent_id_to_FB++;
+                            preferences.begin("myApp", false);
+                            preferences.putInt("cuurent_pending_user_sent", current_sent_id_to_FB);
+                            preferences.end();
+                            Serial.println("current_sent_id_to_FB value:");
+                            Serial.println(current_sent_id_to_FB);
+                        }
+                        else {
+                            sendPendingUsersToFB();
+                        }
                     }
                     else {
                         if (millis() - reconnectTime > reconnectionTimeout) {
@@ -962,89 +1189,84 @@ void loop() {
                         }
                     }
                     id++;
+                    preferences.begin("myApp", false);
+                    preferences.putInt("id", id);
+                    preferences.end();
+                    addLogToFile(FingerID, false, true, currentTimeStr);
                 }
                 else {
                     Serial.println("there is no avalibe place in the system\n");
                 }
             }
-
-
         }
-
     } // end if fingerif not found
 
     // found image
     else if (FingerID > 0) {
-        Serial.print("got here");
-        // check if user have been approved
-        if (Firebase.ready() && (WiFi.status() == WL_CONNECTED)) { // upload the data to the firebase to the pinding users
+        if (isUserInFile(FingerID, approved_users_path)) { // check if is in the approved file
+            setColor(0, 255, 0);
+            display.clearDisplay();
+            display.println("Welcome!\n");
+            display.display();
+            delay(1000);
+            addLogToFile(FingerID, true, false, currentTimeStr);
+
+        }
+        else if (isUserInFile(FingerID, rejected_users_path)) { // check if is  in the rejected file
+            setColor(255, 0, 0);
+            display.clearDisplay();
+            display.println("Rejected!\n");
+            display.display();
+            delay(1000);
+            addLogToFile(FingerID, false, false, currentTimeStr);
+        }
+        // check if user have been approved or rejected
+        else if (Firebase.ready() && (WiFi.status() == WL_CONNECTED)) { // upload the data to the firebase to the pinding users
             if (isUserExistInFBList(FingerID, currentTimeStr, true)) { // this function insert the user to the approved users file
                 setColor(0, 255, 0);
                 display.clearDisplay();
                 display.println("Welcome!\n");
                 display.display();
                 delay(1000);
+                addLogToFile(FingerID, true, false, currentTimeStr);
             }
-            else if (isUserExistInFBList(FingerID, currentTimeStr, false)) {
+            // isUserExistInFBList cehck in firebase and updates the files
+            else if (isUserExistInFBList(FingerID, currentTimeStr, false)) { // false for rejected
                 setColor(255, 0, 0);
                 display.clearDisplay();
                 display.println("Rejected!\n");
                 display.display();
                 delay(1000);
-            }
-            else { // user is waiting in the pendig list
-                setColor(255, 0, 255);
-                display.clearDisplay();
-                display.setTextSize(1);
-                display.setTextColor(WHITE);
-                display.setCursor(0, 10);
-                // Display static text
-                display.println("Access Denied, you");
-                display.setCursor(0, 30);
-                display.println("are in the waiting list");
-                display.display();
-                delay(1000);
-                Serial.println("\nYou are in the pending list mannn!, wait until the ceo accept your request\n");
-                printSPIFFSfiles();
+                addLogToFile(FingerID, false, false, currentTimeStr);
             }
         }
-        else { // not connected to internet
-            // we have to check only in the file of the approved users
-            if (isUserInFile(FingerID, approved_users_path)) {
-                setColor(0, 255, 0);
-                display.clearDisplay();
-                display.println("Welcome!\n");
-                display.display();
-                delay(1000);
-            }
-            else if (isUserInFile(FingerID, rejected_users_path)) {
-                setColor(255, 0, 0);
-                display.clearDisplay();
-                display.println("Rejected!\n");
-                display.display();
-                delay(1000);
-            }
-            else { // user is waiting in the pendig list
-                setColor(255, 0, 255);
-                display.clearDisplay();
-                display.setTextSize(1);
-                display.setTextColor(WHITE);
-                display.setCursor(0, 10);
-                // Display static text
-                display.println("Access Denied");
-                display.setCursor(0, 30);
-                display.println("Waiting List");
-                display.display();
-                delay(1000);
-                Serial.println("\nYou are in the pending list mannn!, wait until the ceo accept your request\n");
-
-                //printJsonFileContent(path);
-                printSPIFFSfiles();
-            }
-
-
+        else { // user is waiting in the pendig list
+            setColor(255, 0, 255);
+            display.clearDisplay();
+            display.setTextSize(1);
+            display.setTextColor(WHITE);
+            display.setCursor(0, 10);
+            // Display static text
+            display.println("Access Denied, you");
+            display.setCursor(0, 30);
+            display.println("are in the waiting list");
+            display.display();
+            delay(1000);
+            Serial.println("\nYou are in the pending list mannn!, wait until the ceo accept your request\n");
+            addLogToFile(FingerID, false, true, currentTimeStr);
         }
     }
+
+    //addLogToFile(id, is_approved, is_pending, currentTimeStr);
+
+    if ((millis() - printFileContentTime) > printFileContentTimeOut) {
+        printFileContentTime = millis();
+        printFileContent(approved_users_path);
+        printFileContent(rejected_users_path);
+        printFileContent(pending_users_path);
+        printFileContent(users_logs_path);
+    }
+
     if (!(WiFi.status() == WL_CONNECTED) && ((millis() - reconnectTime) > reconnectionTimeout)) {
         reconnectTime = millis();
         connectToWifi();
