@@ -52,7 +52,7 @@ char hexaKeys[ROWS][COLS] = {
 
 
 byte rowPins[ROWS] = { 19,27, 26, 25 }; //connect to the row pinouts of the keypad
-byte colPins[COLS] = { 2, 4, 5, 18 }; //connect to the column pinouts of the keypad
+byte colPins[COLS] = { 15, 4, 5, 18 }; //connect to the column pinouts of the keypad
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS);
@@ -69,7 +69,6 @@ const char* approved_users_path = "/approved_users.json";
 const char* pending_users_path = "/pending_users.json";
 const char* rejected_users_path = "/rejected_users.json";
 const char* users_logs_path = "/users_logs.json";
-FirebaseJson content;
 unsigned long dataMillis = 0;
 unsigned long WifiStartTime = 0; //for wifi
 unsigned long connectionTimeout = 10000; // 10 seconds
@@ -80,10 +79,15 @@ unsigned long reconnectionTimeout = 120000; // 2 min to reconnect // need to cha
 unsigned long UpdateTime = 0;
 unsigned long UpdateTimeout = 120000;   //update firebase every 2 mins //need to change
 unsigned long ID_Timeout = 12000;
+int fingerprintID_StartTime = 0;
+unsigned long fingerprintID_Timeout = 20000; // 20 seconds for fingerprint
 uint8_t id = 1;
 unsigned int current_sent_id_to_FB = 0;
+unsigned int users_logs_counter = 1;
+unsigned int users_logs_FB_counter = 1;
 String updated_users_from_FB_to_files = ""; // 2 options: rejected file or approved file
-bool isConnected = false;
+int fingerprint_timeout = -20;
+bool hasConnected = false;
 /* 2. Define the API Key */
 /* 3. Define the project ID */
 #define API_KEY "AIzaSyCQOPaLIyCOJI71ASLu-DvJTlsbGsqRupA"
@@ -187,6 +191,7 @@ void connectToWifi() {
         Serial.println("configure the time ");
         configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
         Serial.println("\n");
+    hasConnected = true;
     }
 }
 
@@ -247,6 +252,7 @@ void setup() {
     finger.getTemplateCount();
     Serial.print("Sensor contains "); Serial.print(finger.templateCount); Serial.println(" templates");
 
+    initiatePerefernces();
 
     connectToWifi();
 }
@@ -291,15 +297,12 @@ void initiatePerefernces() {
     }
 
     if (preferences.isKey("cuurent_pending_user_sent")) {
-        // The "id" key exists in preferences
-        //preferences.putInt("cuurent_pending_user_sent", 1);
         current_sent_id_to_FB = preferences.getInt("cuurent_pending_user_sent", 0);
         Serial.print("cuurent_pending_user_sent exists. Value: ");
         Serial.println(current_sent_id_to_FB);
     }
     else {
-        // The "id" key does not exist in preferences, so initialize it with a default value
-        int defaultValue = 0; // Set your desired default value here
+        int defaultValue = 0;
         preferences.putInt("id", defaultValue);
         Serial.print("cuurent_pending_user_sent did not exist. Initialized with default value: ");
         Serial.println(defaultValue);
@@ -310,6 +313,34 @@ void initiatePerefernces() {
     }
     else {
         preferences.putString("updated_users_from_FB_to_files", updated_users_from_FB_to_files);
+    }
+
+    // users_logs_counter
+
+    if (preferences.isKey("users_logs_counter")) {
+        users_logs_counter = preferences.getInt("users_logs_counter", 0);
+        Serial.print("users_logs_counter exists. Value: ");
+        Serial.println(users_logs_counter);
+    }
+    else {
+        // The "id" key does not exist in preferences, so initialize it with a default value
+        int defaultValue = 1;
+        preferences.putInt("users_logs_counter", defaultValue);
+        Serial.print("users_logs_counter did not exist. Initialized with default value: ");
+        Serial.println(defaultValue);
+    }
+  
+  if (preferences.isKey("users_logs_FB_counter")) {
+        users_logs_FB_counter = preferences.getInt("users_logs_FB_counter", 0);
+        Serial.print("users_logs_FB_counter exists. Value: ");
+        Serial.println(users_logs_FB_counter);
+    }
+    else {
+        // The "id" key does not exist in preferences, so initialize it with a default value
+        int defaultValue = 1;
+        preferences.putInt("users_logs_FB_counter", defaultValue);
+        Serial.print("users_logs_FB_counter did not exist. Initialized with default value: ");
+        Serial.println(defaultValue);
     }
 
     preferences.end();
@@ -671,6 +702,7 @@ uint8_t getFingerprintEnroll() {
 }
 
 
+
 void setColor(int redValue, int greenValue, int blueValue) {
     analogWrite(redPin, redValue);
     analogWrite(greenPin, greenValue);
@@ -828,7 +860,7 @@ void sendPendingUsersToFB() {
     Serial.println("\n");
 
     file.close();
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(10000);
     file = SPIFFS.open(pending_users_path, "r");
 
     if (Firebase.ready()) {
@@ -837,7 +869,7 @@ void sendPendingUsersToFB() {
                 file.read();
             }
         }
-        while (file.available()) {
+        while (file.available() && (current_sent_id_to_FB < id)) {
             DeserializationError error = deserializeJson(doc, file);
             if (error) {
                 Serial.println("sendPendingUsersToFB-------- Failed to read JSON");
@@ -856,6 +888,7 @@ void sendPendingUsersToFB() {
             JsonObject userObj = doc.as<JsonObject>();
 
             String documentPath = "PendingUsers/user" + userObj["FingerPrintID"].as<String>(); // id- fingerPrintID
+      FirebaseJson content;
 
             content.set("fields/data/mapValue/fields/FingerPrintID/integerValue", userObj["FingerPrintID"].as<int>());
             content.set("fields/data/mapValue/fields/id/stringValue", userObj["id"].as<String>());
@@ -963,6 +996,7 @@ void addPendingUserToFireBase(int fingerprint_id, String id, char* currentTimeSt
     if (Firebase.ready()) {
 
         String documentPath = "PendingUsers/user" + String(fingerprint_id); // id- fingerPrintID
+    FirebaseJson content;
 
         content.set("fields/data/mapValue/fields/FingerPrintID/integerValue", fingerprint_id);
         content.set("fields/data/mapValue/fields/id/stringValue", id.c_str());
@@ -1066,11 +1100,73 @@ void addLogToFile(int fingerprint_id, bool is_approved, bool is_pending, char* t
 
     if (serializeJson(doc, file)) {
         Serial.println("addLogToFile----------- Data written to file successfully");
+    users_logs_counter++;
+        preferences.begin("myApp", false);
+        preferences.putInt("users_logs_counter", users_logs_counter);
+        preferences.end();
+        Serial.println("users_logs_counter value:");
+        Serial.println(users_logs_counter);
     }
     else {
         Serial.println("addLogToFile------------ Failed to write data to file");
     }
 
+    file.close();
+}
+
+void sendUsersLogsToFB() {
+    DynamicJsonDocument doc(10000);
+    File file = SPIFFS.open(users_logs_path, "r");
+
+    if (Firebase.ready()) {
+        if (file.available()) {
+            for (int i = 1; i <= users_logs_FB_counter; i++) {
+                file.read();
+            }
+        }
+        while (file.available()) {
+            DeserializationError error = deserializeJson(doc, file);
+            if (error) {
+                Serial.println("sendUsersLogsToFB-------- Failed to read JSON");
+                return;
+            }
+            String jsonString;
+            serializeJson(doc, jsonString);
+            if (jsonString.startsWith("[") && jsonString.endsWith("]")) {
+                jsonString = jsonString.substring(1, jsonString.length() - 1);
+            }
+            error = deserializeJson(doc, jsonString);
+            if (error) {
+                Serial.println("sendUsersLogsToFB-------- Failed to read JSON");
+                return;
+            }
+            JsonObject userObj = doc.as<JsonObject>();
+
+            String documentPath = "UsersLogs/log" + String(users_logs_counter);
+      FirebaseJson content;
+
+            content.set("fields/data/mapValue/fields/FingerPrintID/integerValue", userObj["FingerPrintID"].as<int>());
+            content.set("fields/data/mapValue/fields/status/stringValue", userObj["status"].as<String>());
+            content.set("fields/data/mapValue/fields/time/stringValue", userObj["time"].as<String>());
+
+            Serial.println("uploading logs to FB");
+            Serial.println("Create a document... ");
+
+            if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), content.raw())) {
+                Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+                users_logs_FB_counter++;
+                preferences.begin("myApp", false);
+                preferences.putInt("users_logs_FB_counter", users_logs_FB_counter);
+                preferences.end();
+                Serial.println("users_logs_FB_counter value:");
+                Serial.println(users_logs_FB_counter);
+            }
+            else {
+                Serial.println(fbdo.errorReason());
+            }
+            file.read();
+        }
+    }
     file.close();
 }
 
@@ -1090,10 +1186,18 @@ void loop() {
     FingerID = getFingerprintID(); // Get the Fingerprint ID from the Scanner
 
     delay(50);
-
-
     struct tm timeinfo;
     char currentTimeStr[20] = "";
+    
+  if (hasConnected) {
+    if (!getLocalTime(&timeinfo)) {
+      Serial.println("Failed to obtain time");
+    }
+    else {
+      strftime(currentTimeStr, sizeof(currentTimeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
+    }
+  }
+  
     bool is_pending = false;
     bool is_approved = false;
 
@@ -1129,7 +1233,23 @@ void loop() {
             delay(2000);
         }
         else {
+
+
             fingerPrintID = getFingerprintEnroll();
+
+            if (fingerPrintID == fingerprint_timeout) {
+                setColor(255, 50, 0);
+                display.clearDisplay();
+                display.setTextSize(1);
+                display.setTextColor(WHITE);
+                display.setCursor(0, 10);
+                // Display static text
+                display.println("FP Timeout");
+                display.setCursor(0, 30);
+                display.println("Please try again");
+                display.display();
+                delay(2000);
+            }
 
             if (fingerPrintID != FINGERPRINT_OK) {
                 setColor(255, 50, 0);
@@ -1147,14 +1267,14 @@ void loop() {
 
             else {
                 printSPIFFSfiles();
-                if (id > 0 && id <= 162) {
-                    if (!getLocalTime(&timeinfo)) {
+                if (id > 0 && id <= 162 && fingerPrintID == FINGERPRINT_OK) {
+                    /*if (!getLocalTime(&timeinfo)) {
                         Serial.println("Failed to obtain time");
                         //return;
                     }
                     else {
                         strftime(currentTimeStr, sizeof(currentTimeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
-                    }
+                    }*/
                     addUserToPendingUsersFile(id, id_str, currentTimeStr);
                     Serial.println("Files IN SPIFFS");
                     printSPIFFSfiles();
@@ -1192,7 +1312,7 @@ void loop() {
                     preferences.begin("myApp", false);
                     preferences.putInt("id", id);
                     preferences.end();
-                    addLogToFile(FingerID, false, true, currentTimeStr);
+                    //addLogToFile(FingerID, false, true, currentTimeStr);
                 }
                 else {
                     Serial.println("there is no avalibe place in the system\n");
@@ -1265,6 +1385,10 @@ void loop() {
         printFileContent(rejected_users_path);
         printFileContent(pending_users_path);
         printFileContent(users_logs_path);
+
+        if (WiFi.status() == WL_CONNECTED) {
+            sendUsersLogsToFB();
+        }
     }
 
     if (!(WiFi.status() == WL_CONNECTED) && ((millis() - reconnectTime) > reconnectionTimeout)) {
