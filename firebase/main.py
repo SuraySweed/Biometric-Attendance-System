@@ -1,7 +1,8 @@
 from typing import final
 import re
+import csv
 import logging
-from telegram import Update
+from telegram import Update, Bot
 from firebase_admin import credentials, initialize_app, firestore
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackContext, filters, ContextTypes
 
@@ -115,15 +116,15 @@ async def showApprovedUsers(update: Update, context: CallbackContext):
             if document_data:
                 fingerID = document_data.get('data', {}).get('FingerPrintID')
                 userID = document_data.get('data', {}).get('id')
-                time = document_data.get('Time')
+                #time = document_data.get('data', {}).get('time')
 
                 if fingerID is not None and userID is not None:
-                    usersList_message += f"user{fingerID} ID: {userID}, logged in at {time}\n"
+                    usersList_message += f"user{fingerID} ID: {userID}\n"
                 else:
                     logging.warning(f"Field not found or is empty in document: {doc.id}")
             else:
                 logging.warning(f"Document data is empty for document: {doc.id}")
-        await update.message.reply_text(usersList_message)
+            await update.message.reply_text(usersList_message)
         # Log a message after processing all documents
         logging.info("Finished processing documents")
 
@@ -160,10 +161,10 @@ async def showRejectedUsers(update: Update, context: CallbackContext):
             if document_data:
                 fingerID = document_data.get('data', {}).get('FingerPrintID')
                 userID = document_data.get('data', {}).get('id')
-                time = document_data.get('Time')
+                #time = document_data.get('data', {}).get('time')
 
                 if fingerID is not None and userID is not None:
-                    usersList_message += f"user{fingerID} ID: {userID}, logged in at {time}\n"
+                    usersList_message += f"user{fingerID} ID: {userID}\n"
                 else:
                     logging.warning(f"Field not found or is empty in document: {doc.id}")
             else:
@@ -176,6 +177,54 @@ async def showRejectedUsers(update: Update, context: CallbackContext):
         # Handle exceptions here, log the error, and potentially send an error message to the user
         logging.error(f"Error processing Firestore documents: {str(e)}")
         await update.message.reply_text("An error occurred while processing Firestore documents.")
+
+async def showLogs(update: Update, context: CallbackContext):
+    try:
+        # Read data from Firebase
+        db = firestore.client()
+        collection_name = 'UsersLogs'
+
+        # Check if the collection exists and is not empty
+        collection_ref = db.collection(collection_name)
+        documents = collection_ref.stream()
+        if len(list(documents)) == 0:
+            await update.message.reply_text("The collection is empty or does not exist.")
+            return
+        # Log the total number of documents in the collection
+        logging.info(f"Total documents in '{collection_name}': {len(list(documents))}")
+
+        # Reset the documents generator to iterate over them again
+        documents = collection_ref.stream()
+        usersList_message = "users login users:\n"
+        for doc in documents:
+            # Log document ID before processing
+            logging.info(f"Processing document: {doc.id}")
+
+            # Get data from the current document
+            document_data = doc.to_dict()
+
+            if document_data:
+                fingerID = document_data.get('data', {}).get('FingerPrintID')
+                #userID = document_data.get('data', {}).get('id')
+                time = document_data.get('data', {}).get('time')
+                if fingerID is not None and time is not None:
+                    usersList_message += f"user{fingerID} logged in at: {time}\n"
+            else:
+                logging.warning(f"Document data is empty for document: {doc.id}")
+        if usersList_message:
+            with open('UsersLogs.txt', 'w') as file:
+                file.write(usersList_message)
+            bot = Bot(token=TOKEN)
+            chat_id = update.message.chat_id
+            await bot.send_document(chat_id=chat_id, document=open('UsersLogs.txt', 'rb'))
+        # Log a message after processing all documents
+        logging.info("Finished processing documents")
+
+    except Exception as e:
+        # Handle exceptions here, log the error, and potentially send an error message to the user
+        logging.error(f"Error processing Firestore documents: {str(e)}")
+        await update.message.reply_text("An error occurred while processing Firestore documents.")
+
 
 async def accept(update: Update, context: CallbackContext):
     if len(context.args) == 1:
@@ -332,6 +381,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('check_firestore', check_firestore))
     app.add_handler(CommandHandler('approved_users', showApprovedUsers))
     app.add_handler(CommandHandler('rejected_users', showRejectedUsers))
+    app.add_handler(CommandHandler('users_logs', showLogs))
     app.add_handler(CommandHandler("reject", reject))
     app.add_handler(CommandHandler("accept", accept))
 
