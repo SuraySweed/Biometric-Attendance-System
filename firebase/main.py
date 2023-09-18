@@ -32,6 +32,7 @@ This bot allows you to interact with a Firestore database and perform various ta
 \- /check\_firestore: Check pending users in the Firestore database\.
 \- /approved\_users: Show approved users in the Firestore database\.
 \- /rejected\_users: Show rejected users in the Firestore database\.
+\- /users\_logs: get text file that contains users logs\.
 \- /reject: Reject a user from the pending users list \(replace `ID` with the user's FingerID\)\.
 \- /accept: Accept a user and move them to the approved users list \(replace `ID` with the user's FingerID\)\.
 
@@ -124,7 +125,7 @@ async def showApprovedUsers(update: Update, context: CallbackContext):
                     logging.warning(f"Field not found or is empty in document: {doc.id}")
             else:
                 logging.warning(f"Document data is empty for document: {doc.id}")
-            await update.message.reply_text(usersList_message)
+        await update.message.reply_text(usersList_message)
         # Log a message after processing all documents
         logging.info("Finished processing documents")
 
@@ -205,10 +206,10 @@ async def showLogs(update: Update, context: CallbackContext):
 
             if document_data:
                 fingerID = document_data.get('data', {}).get('FingerPrintID')
-                #userID = document_data.get('data', {}).get('id')
+                status = document_data.get('data', {}).get('status')
                 time = document_data.get('data', {}).get('time')
                 if fingerID is not None and time is not None:
-                    usersList_message += f"user{fingerID} logged in at: {time}\n"
+                    usersList_message += f"user{fingerID} logged in at: {time}, status:{status}\n"
             else:
                 logging.warning(f"Document data is empty for document: {doc.id}")
         if usersList_message:
@@ -347,7 +348,7 @@ def handle_response(text: str) -> str:
         return 'hey there'
     elif 'how are you' in processed:
         return 'I am good, Thank you!'
-    else: return 'BAKAAAAA'
+    else: return 'I dont understand'
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_type: str = update.message.chat.type
