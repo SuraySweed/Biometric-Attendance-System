@@ -74,17 +74,17 @@ unsigned long WifiStartTime = 0; //for wifi
 unsigned long connectionTimeout = 10000; // 10 seconds
 unsigned long reconnectTime = 0;
 unsigned long printFileContentTime = 0;
-unsigned long printFileContentTimeOut = 180000; // 3 min to reconnect // need to change
+unsigned long printFileContentTimeOut = 150000; // 2.5 min to reconnect // need to change
 unsigned long reconnectionTimeout = 120000; // 2 min to reconnect // need to change
 unsigned long UpdateTime = 0;
 unsigned long UpdateTimeout = 120000;   //update firebase every 2 mins //need to change
-unsigned long ID_Timeout = 12000;
+unsigned long ID_Timeout = 15000;
 int fingerprintID_StartTime = 0;
 unsigned long fingerprintID_Timeout = 20000; // 20 seconds for fingerprint
 uint8_t id = 1;
 unsigned int current_sent_id_to_FB = 0;
 unsigned int users_logs_counter = 1;
-unsigned int users_logs_FB_counter = 1;
+unsigned int users_logs_FB_counter = 0;
 String updated_users_from_FB_to_files = ""; // 2 options: rejected file or approved file
 int fingerprint_timeout = -20;
 bool hasConnected = false;
@@ -190,8 +190,8 @@ void connectToWifi() {
         connectToFireBase();
         Serial.println("configure the time ");
         configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+        hasConnected = true;
         Serial.println("\n");
-    hasConnected = true;
     }
 }
 
@@ -219,7 +219,7 @@ void setup() {
 
     //----------- initiate SPIFFS -------------
     bool success = SPIFFS.begin();
-    SPIFFS.format();
+    //SPIFFS.format();
 
     if (success) {
         Serial.println("File system mounted with success");
@@ -247,8 +247,8 @@ void setup() {
             delay(1);
         }
     }
-
-    fingerPrintSensorClear(); // very importantttt
+    //preferences.clear();
+    //fingerPrintSensorClear(); // very importantttt
     finger.getTemplateCount();
     Serial.print("Sensor contains "); Serial.print(finger.templateCount); Serial.println(" templates");
 
@@ -283,8 +283,8 @@ void initiatePerefernces() {
 
     if (preferences.isKey("id")) {
         // The "id" key exists in preferences
-        preferences.putInt("id", 1);
-        id = preferences.getInt("id", 0);
+        //preferences.putInt("id", 1);
+        id = preferences.getInt("id", 1);
         Serial.print("ID exists. Value: ");
         Serial.println(id);
     }
@@ -303,7 +303,7 @@ void initiatePerefernces() {
     }
     else {
         int defaultValue = 0;
-        preferences.putInt("id", defaultValue);
+        preferences.putInt("cuurent_pending_user_sent", defaultValue);
         Serial.print("cuurent_pending_user_sent did not exist. Initialized with default value: ");
         Serial.println(defaultValue);
     }
@@ -318,7 +318,7 @@ void initiatePerefernces() {
     // users_logs_counter
 
     if (preferences.isKey("users_logs_counter")) {
-        users_logs_counter = preferences.getInt("users_logs_counter", 0);
+        users_logs_counter = preferences.getInt("users_logs_counter", 1);
         Serial.print("users_logs_counter exists. Value: ");
         Serial.println(users_logs_counter);
     }
@@ -336,8 +336,7 @@ void initiatePerefernces() {
         Serial.println(users_logs_FB_counter);
     }
     else {
-        // The "id" key does not exist in preferences, so initialize it with a default value
-        int defaultValue = 1;
+        int defaultValue = 0;
         preferences.putInt("users_logs_FB_counter", defaultValue);
         Serial.print("users_logs_FB_counter did not exist. Initialized with default value: ");
         Serial.println(defaultValue);
@@ -524,7 +523,8 @@ uint8_t getFingerprintEnroll() {
     display.clearDisplay();
     display.drawBitmap(34, 0, FinPr_scan_bits, FinPr_scan_width, FinPr_scan_height, WHITE);
     display.display();
-    while (p != FINGERPRINT_OK) {
+    int Fingerprint_StartTime = millis();
+    while ((p != FINGERPRINT_OK) && (millis() - Fingerprint_StartTime < fingerprintID_Timeout || Fingerprint_StartTime == 0)) {
         p = finger.getImage();
         switch (p) {
         case FINGERPRINT_OK:
@@ -599,7 +599,7 @@ uint8_t getFingerprintEnroll() {
     display.clearDisplay();
     display.drawBitmap(34, 0, FinPr_scan_bits, FinPr_scan_width, FinPr_scan_height, WHITE);
     display.display();
-    while (p != FINGERPRINT_OK) {
+    while (p != FINGERPRINT_OK && (millis() - Fingerprint_StartTime < fingerprintID_Timeout || Fingerprint_StartTime == 0)) {
         p = finger.getImage();
         switch (p) {
         case FINGERPRINT_OK:
