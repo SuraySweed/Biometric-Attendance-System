@@ -1,0 +1,1 @@
+An example added - how to work with the battery

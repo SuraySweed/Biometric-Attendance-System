@@ -1,0 +1,72 @@
+#######################################
+# Syntax Coloring Map For CSWButtons
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+CSWBattery	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+setBatteryPin	KEYWORD2
+getBatteryPin	KEYWORD2
+getVoltagePrecision	KEYWORD2
+getBatteryVoltage	KEYWORD2
+getVoltagePrecision	KEYWORD2
+setVoltagePrecision	KEYWORD2
+getBatteryVoltageSection	KEYWORD2
+getBatteryVoltagePercentage	KEYWORD2
+getBatteryLowThreshold	KEYWORD2
+setBatteryStatsReceivingType	KEYWORD2
+checkIfWeAreCharging	KEYWORD2
+checkIfEmpty	KEYWORD2
+checkIfLow		KEYWORD2
+getSectionsNum	KEYWORD2
+setSectionsNum	KEYWORD2
+getLastCheckTime	KEYWORD2
+setLastCheckTime	KEYWORD2
+getLastBatteryVoltage	KEYWORD2
+setLastBatteryVoltage	KEYWORD2
+setLastBatteryVoltageSection	KEYWORD2
+getLastBatteryVoltageSection	KEYWORD2
+setLastBatteryVoltagePercentage	KEYWORD2
+getLastBatteryVoltagePercentage	KEYWORD2
+setBatteryCoefficient	KEYWORD2
+getBatteryCoefficient	KEYWORD2
+checkBatteryVoltageChanged	KEYWORD2
+calibrateBattery	KEYWORD2
+stopCalibration	KEYWORD2
+resetBattery	KEYWORD2
+setCalibrationIterations	KEYWORD2
+getCalibrationIterations	KEYWORD2
+setBatteryIsCalibrated	KEYWORD2
+getBatteryIsCalibrated	KEYWORD2
+tick				KEYWORD2
+startCollectingData	KEYWORD2
+stopCollectingData	KEYWORD2
+checkIfCollectingData	KEYWORD2
+flushCollectingDataBuffer	KEYWORD2
+getTimeRecheckS		KEYWORD2
+setBatteryCheckType	KEYWORD2
+getBatteryCheckType	KEYWORD2
+setBatteryLowThreshold	KEYWORD2
+setHandlerOnBatteryEmpty	KEYWORD2
+setHandlerOnBatteryLevelChange	KEYWORD2
+setDebugLevel		KEYWORD2
+getDebugLevel		KEYWORD2
+setDebug			KEYWORD2
+enableDebug			KEYWORD2
+disableDebug		KEYWORD2
+
+
+
+getBatat##################################
+# Constants (LITERAL1)
+#######################################
+MIN_TASK_DELAY_S		LITERAL1
+data_receiving_type	LITERAL1
+

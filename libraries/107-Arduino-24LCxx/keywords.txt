@@ -1,0 +1,32 @@
+#######################################
+# Syntax Coloring Map for 107-Arduino-24LCxx
+#######################################
+
+#######################################
+# Class (KEYWORD1)
+#######################################
+
+EEPROM_24LCxx	KEYWORD1
+EEPROM_24LCxx_Type	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+isConnected	KEYWORD2
+fill_page	KEYWORD2
+write_page	KEYWORD2
+read_page	KEYWORD2
+device_name	KEYWORD2
+device_size	KEYWORD2
+page_size	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+LC32	LITERAL1
+LC64	LITERAL1
+LC128	LITERAL1
+LC256	LITERAL1
+LC512	LITERAL1

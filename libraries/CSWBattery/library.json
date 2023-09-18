@@ -1,0 +1,21 @@
+{
+  "name": "CSWBattery",
+  "version": "0.1.0",
+  "keywords": "CSW,SmartWatch,Battery",
+  "description": "The library for the diy smartwatch projects, which operates with their batteries.",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/WindyWanderer/CSWBattery.git"
+  },
+  "authors":
+  [
+    {
+       "name": "Eugene",
+       "email": "eugene@sky.community",
+       "maintainer": true
+    }
+  ],
+  "frameworks": "arduino",
+  "platforms": "*"
+}
