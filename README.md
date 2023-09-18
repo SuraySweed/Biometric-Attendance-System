@@ -6,11 +6,8 @@
 * ESP32: source code for the esp side (firmware).
 * Documentation: wiring diagram + basic operating instructions
 * Unit Tests: tests for individual hardware components (input / output devices).
-* Parameters: contains description of configurable parameters
-
-# Arduino/ESP32 libraries used in this project:
-
-# Arduino/ESP libraries installed for the project:
+* telegramBot_firebase: source code for telegramBot in python + json file for configration of firstore.
+* libraries: arduino/ESP32 libraries used  in this project.
 
 # Project Poster:
 
