@@ -1,8 +1,8 @@
 To run the arduino code on esp32:
 1) Open the esp code using arduino app.
 2) connect usb port with the esp in the pill box.
-3) make partition to the memory of esp (2MB code/ 2MB memory)
-4)add your network ssid and password to helper.h so you can connect the esp to WiFi
+3) make partition to the memory of esp (huge app)
+4)add your network ssid and password to credentialsData.h so you can connect the esp to WiFi
 5) press upload code (make sure you upload to the correct port)
 5) after you see the esp is working , for further future use of the system . it is just a plug and run system.
 (all you need is to connect the usb with a batttary and the hardware/esp side of the system will work and response to users entering and regestiring to the system.)
@@ -12,4 +12,3 @@ To run the telegramBot:
 2)put the json file of the firestore in same directory.
 3)run the code.
 4)now you can react with the telegram bot and do actions on firebase.
-(for help in using the bot, send him the command /info)
