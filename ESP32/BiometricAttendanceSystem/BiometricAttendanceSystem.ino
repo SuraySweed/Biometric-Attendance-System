@@ -158,6 +158,7 @@ void connectToFireBase() {
 }
 
 void connectToWifi() {
+    IPAdress dns(8,8,8,8);
     WiFi.begin(ssid, password);
     // 25 seconds to connect to wifi
     WifiStartTime = millis();
@@ -219,7 +220,7 @@ void setup() {
 
     //----------- initiate SPIFFS -------------
     bool success = SPIFFS.begin();
-    SPIFFS.format();
+    //SPIFFS.format();
 
     if (success) {
         Serial.println("File system mounted with success");
@@ -1248,8 +1249,6 @@ void loop() {
             delay(2000);
         }
         else {
-
-
             fingerPrintID = getFingerprintEnroll();
 
             if (fingerPrintID == fingerprint_timeout) {
@@ -1368,6 +1367,21 @@ void loop() {
                 delay(1000);
                 addLogToFile(FingerID, false, false, currentTimeStr);
             }
+            else { // user is waiting in the pendig list
+              setColor(255, 0, 255);
+              display.clearDisplay();
+              display.setTextSize(1);
+              display.setTextColor(WHITE);
+              display.setCursor(0, 10);
+              // Display static text
+              display.println("Access Denied, you");
+              display.setCursor(0, 30);
+              display.println("are in the waiting list");
+              display.display();
+              delay(1000);
+              Serial.println("\nYou are in the pending list mannn!, wait until the ceo accept your request\n");
+              addLogToFile(FingerID, false, true, currentTimeStr);
+          }
         }
         else { // user is waiting in the pendig list
             setColor(255, 0, 255);
