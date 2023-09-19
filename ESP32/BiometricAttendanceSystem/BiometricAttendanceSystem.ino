@@ -219,7 +219,7 @@ void setup() {
 
     //----------- initiate SPIFFS -------------
     bool success = SPIFFS.begin();
-    //SPIFFS.format();
+    SPIFFS.format();
 
     if (success) {
         Serial.println("File system mounted with success");

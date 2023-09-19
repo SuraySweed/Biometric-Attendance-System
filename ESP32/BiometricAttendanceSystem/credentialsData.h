@@ -3,9 +3,10 @@
 //const char *password = "DV29QJWG3KN9";
 //const char *ssid = "Suray Sweed "; //ENTER YOUR WIFI SETTINGS
 //const char *password = "12345678";
-const char *ssid = "Boran"; //ENTER YOUR WIFI SETTINGS
-const char *password = "zeuv8379";
-
+//const char *ssid = "Boran"; //ENTER YOUR WIFI SETTINGS
+//const char *password = "zeuv8379";
+const char *ssid = "YosefBr"; //ENTER YOUR WIFI SETTINGS
+const char *password = "12345678";
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 7200;

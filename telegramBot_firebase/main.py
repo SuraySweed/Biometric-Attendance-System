@@ -18,7 +18,7 @@ def is_valid_message(message):
 
 #commands
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('welcome to BAS_FB_bot!')
+    await update.message.reply_text('welcome to BAS_FB_bot!\nfor help type /info')
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_info_message = """
@@ -348,7 +348,7 @@ def handle_response(text: str) -> str:
         return 'hey there'
     elif 'how are you' in processed:
         return 'I am good, Thank you!'
-    else: return 'I dont understand'
+    else: return 'I dont understand\nfor help type /info'
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_type: str = update.message.chat.type

@@ -13,10 +13,10 @@
 #include <time.h>
 
 
-const char* ssid     = "Suray Sweed ";
-const char* password = "12345678";
+const char* ssid     = "Boran";
+const char* password = "zeuv8379";
 
-const char* ntpServer = "pool.ntp.org";
+const char* ntpServer = "time.google.com";
 const long  gmtOffset_sec = 7200;
 const int   daylightOffset_sec = 3600;
 
@@ -26,6 +26,7 @@ void setup(){
   // Connect to Wi-Fi
   Serial.print("Connecting to ");
   Serial.println(ssid);
+  IPAddress dns(8,8,8,8);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
