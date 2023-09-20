@@ -158,7 +158,7 @@ void connectToFireBase() {
 }
 
 void connectToWifi() {
-    IPAdress dns(8,8,8,8);
+    //IPAdress dns(8,8,8,8);
     WiFi.begin(ssid, password);
     // 25 seconds to connect to wifi
     WifiStartTime = millis();
