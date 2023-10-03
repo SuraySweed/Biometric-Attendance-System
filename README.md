@@ -6,7 +6,7 @@ Our project utilizes fingerprint recognition technology to seamlessly record and
 This is a Biometric attendance system that lets users register to the system by typing their ID number and scanning their fingerprint, the manager
 accepts and rejects users with telegram bot that helps him to manage the pending users list in the Firestore database.
 at every attempt of user to enter the system, it saves its entry time to Logs file.
-- istallation guide: [instructions.txt](Documentation/instructions.txt)
+- installation guide: [instructions.txt](Documentation/instructions.txt)
 - user manual: [User_Manual.pdf](Documentation/User_Manual.pdf)
 
 **System Diagram:**
