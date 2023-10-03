@@ -11,7 +11,10 @@ at every attempt of user to enter the system, it saves its entry time to Logs fi
 
 **System Diagram:**
 
+![image](https://github.com/SuraySweed/Biometric-Attendance-System/assets/75131035/af8ac997-1231-4756-bd14-49ec46cf6c61)
+
 **state machine:**
+
 ![image](https://github.com/SuraySweed/Biometric-Attendance-System/assets/75131035/017573bb-e6f7-4c1e-938f-c892c817bc1f)
 
 # libraries:
