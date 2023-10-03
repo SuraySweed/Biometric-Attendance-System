@@ -27,9 +27,10 @@ at every attempt of user to enter the system, it saves its entry time to Logs fi
 - ArduinoJson : ^6.21.3
 - Firebase Arduino Client Library for ESP8266 and ESP32: ^4.3.19
 - Time: ^1.6.1
+
 **Python:**
-1. telegram: pip install python-telegram-bot
-2. firebase: pip install firebase-admin
+- telegram: pip install python-telegram-bot
+- firebase: pip install firebase-admin
 
 # Folder description:
 * ESP32: source code for the esp side (firmware).
