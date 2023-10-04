@@ -13,6 +13,11 @@ at every attempt of user to enter the system, it saves its entry time to Logs fi
 
 ![image](https://github.com/SuraySweed/Biometric-Attendance-System/assets/75131035/af8ac997-1231-4756-bd14-49ec46cf6c61)
 
+**Hardware diagram**
+
+![image](https://github.com/SuraySweed/Biometric-Attendance-System/assets/75131035/719f9bb3-fd8c-4ba5-a860-dcfe6968d7ac)
+
+
 **state machine:**
 
 ![image](https://github.com/SuraySweed/Biometric-Attendance-System/assets/75131035/017573bb-e6f7-4c1e-938f-c892c817bc1f)
@@ -43,6 +48,7 @@ at every attempt of user to enter the system, it saves its entry time to Logs fi
 * libraries: arduino/ESP32 libraries used  in this project.
 
 # Project Poster:
+![שקופית1](https://github.com/SuraySweed/Biometric-Attendance-System/assets/75131035/c37e4e59-20c1-4406-99c6-2acb1f12f789)
 
 
 
